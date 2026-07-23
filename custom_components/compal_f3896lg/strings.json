@@ -1,0 +1,65 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect your Ziggo cable gateway",
+        "description": "Enter the address and admin password of your Ziggo gateway (Sagemcom / Compal F3896LG). The password is the one printed on the sticker on the gateway, unless you changed it.\n\nClose the gateway's web UI first — it allows only one session at a time.",
+        "data": {
+          "host": "Gateway address",
+          "password": "Admin password"
+        },
+        "data_description": {
+          "host": "The gateway's IP address (default `192.168.178.1`).",
+          "password": "The admin password from the gateway's sticker, or your changed one."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-enter your gateway password",
+        "description": "The admin password for the gateway at `{host}` was rejected. Enter the current password.",
+        "data": {
+          "password": "Admin password"
+        },
+        "data_description": {
+          "password": "The admin password from the gateway's sticker, or your changed one."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The password was rejected. Check the admin password on the gateway's sticker and try again.",
+      "lockout": "Too many failed logins — the gateway has locked out password attempts. Wait a few minutes and try again.",
+      "session_busy": "The gateway is already in use by another session. Close its web UI and try again.",
+      "cannot_connect": "Could not reach the gateway at that address. Check the IP and that you are on the same network.",
+      "unknown": "Something went wrong. Please try again."
+    },
+    "abort": {
+      "already_configured": "This gateway is already set up.",
+      "unknown_entry": "The gateway to re-authenticate could not be found.",
+      "reauth_successful": "The gateway password was updated successfully."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "docsis_status": { "name": "DOCSIS status" },
+      "uptime": { "name": "Uptime" },
+      "connected_devices": { "name": "Connected devices" },
+      "downstream_power_min": { "name": "Downstream power (min)" },
+      "downstream_snr_min": { "name": "Downstream SNR (min)" },
+      "downstream_channels": { "name": "Downstream channels" },
+      "upstream_channels": { "name": "Upstream channels" },
+      "corrected_errors": { "name": "Corrected errors" },
+      "uncorrected_errors": { "name": "Uncorrected errors" },
+      "download_speed": { "name": "Provisioned download speed" },
+      "upload_speed": { "name": "Provisioned upload speed" },
+      "firmware": { "name": "Firmware version" }
+    },
+    "binary_sensor": {
+      "modem_operational": { "name": "Modem operational" },
+      "bridge_mode": { "name": "Bridge mode" },
+      "wifi_2g": { "name": "Wi-Fi 2.4 GHz" },
+      "wifi_5g": { "name": "Wi-Fi 5 GHz" }
+    },
+    "button": {
+      "reboot": { "name": "Reboot gateway" }
+    }
+  }
+}

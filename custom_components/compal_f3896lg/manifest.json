@@ -1,0 +1,17 @@
+{
+  "domain": "compal_f3896lg",
+  "name": "Ziggo Cable Gateway (F3896LG)",
+  "codeowners": [
+    "@abovecolin"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/abovecolin/HA-Compal-F3896LG",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/abovecolin/HA-Compal-F3896LG/issues",
+  "requirements": [
+    "compalf3896lg==1.0.0"
+  ],
+  "version": "1.0.0"
+}
