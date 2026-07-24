@@ -60,6 +60,7 @@
       "wifi_5g_ssid": { "name": "Wi-Fi 5 GHz SSID" },
       "last_event": { "name": "Last event" },
       "wan_ip": { "name": "WAN IP address" },
+      "dns_servers": { "name": "DNS servers" },
       "software_update_status": { "name": "Software update status" },
       "port_forward_rules": { "name": "Port forwarding rules" },
       "dhcp_reservations": { "name": "DHCP reservations" },

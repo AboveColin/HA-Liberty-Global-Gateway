@@ -296,6 +296,19 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         attr_fn=_wan_attrs,
     ),
     CompalSensorDescription(
+        key="dns_servers",
+        translation_key="dns_servers",
+        icon="mdi:dns",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (
+            ", ".join(getattr(d.get("provisioning"), "ipv4_dns", []) or []) or None
+        ),
+        attr_fn=lambda d: {
+            "ipv4": getattr(d.get("provisioning"), "ipv4_dns", []) or [],
+            "ipv6": getattr(d.get("provisioning"), "ipv6_dns", []) or [],
+        },
+    ),
+    CompalSensorDescription(
         key="software_update_status",
         translation_key="software_update_status",
         icon="mdi:package-up",
