@@ -105,14 +105,19 @@ class CompalDeviceTracker(
         return host.hostname if host else None
 
     @property
-    def extra_state_attributes(self) -> dict[str, str | int | None]:
-        """Return interface details for the tracked device."""
+    def extra_state_attributes(self) -> dict[str, str | int | float | None]:
+        """Return connection details for the tracked device."""
         host = self._host
         if host is None:
             return {}
         return {
             "interface": host.interface,
+            "device_type": host.device_type,
             "band": host.band,
             "ssid": host.ssid,
+            "rssi": host.rssi,
+            "link_speed": host.speed,
             "ethernet_port": host.ethernet_port,
+            "ipv6_address": host.ipv6_address,
+            "lease_time_remaining": host.lease_time_remaining,
         }

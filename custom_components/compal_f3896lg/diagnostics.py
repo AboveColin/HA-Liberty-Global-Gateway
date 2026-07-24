@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -9,6 +10,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
+
+# Event-log messages are free text that can embed MAC addresses
+# (e.g. "CM-MAC=aa:bb:cc:dd:ee:ff"); scrub them before diagnostics leave the box.
+_MAC_RE = re.compile(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}")
 
 TO_REDACT = {
     "password",
@@ -63,9 +68,26 @@ async def async_get_config_entry_diagnostics(
         cdata = coordinator.data or {}
         info["system"] = _model_dump(cdata.get("system"))
         info["cable"] = _model_dump(cdata.get("cable"))
+        info["modem_mode"] = _model_dump(cdata.get("modem_mode"))
+        info["lan"] = _model_dump(cdata.get("lan"))
+        info["ipv6"] = _model_dump(cdata.get("ipv6"))
+        info["wifi"] = {
+            band: _model_dump(cfg)
+            for band, cfg in (cdata.get("wifi_configs") or {}).items()
+        }
+        info["registration"] = _model_dump(cdata.get("registration"))
         info["signal"] = cdata.get("signal")
         info["plan"] = cdata.get("plan")
         info["host_count"] = len(cdata.get("hosts") or [])
+        # Recent event-log lines (already free of PII), newest first.
+        info["event_log"] = [
+            {
+                "time": e.time,
+                "priority": e.priority,
+                "message": _MAC_RE.sub("**:**:**:**:**:**", e.message or ""),
+            }
+            for e in (cdata.get("event_log") or [])[:15]
+        ]
         data["coordinator"] = info
 
     return data

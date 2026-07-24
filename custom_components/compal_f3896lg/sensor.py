@@ -47,7 +47,34 @@ def _downstream_attrs(data: dict) -> dict[str, Any]:
     return {
         "channel_count": signal.get("downstream_channels"),
         "power_max_dbmv": signal.get("downstream_power_max"),
+        "locked_channels": signal.get("downstream_locked"),
     }
+
+
+def _upstream_attrs(data: dict) -> dict[str, Any]:
+    signal = data.get("signal") or {}
+    return {
+        "channel_count": signal.get("upstream_channels"),
+        "power_min_dbmv": signal.get("upstream_power_min"),
+        "locked_channels": signal.get("upstream_locked"),
+    }
+
+
+# Wi-Fi band identifiers, as used across the gateway API.
+_BAND_2G = "band2g"
+_BAND_5G = "band5g"
+
+
+def _wifi_cfg(data: dict, band: str, attr: str) -> Any:
+    """Read one attribute from a band's Wi-Fi config, if present."""
+    config = (data.get("wifi_configs") or {}).get(band)
+    return getattr(config, attr, None) if config else None
+
+
+def _last_event(data: dict):
+    """Return the most recent event-log entry (newest first), if any."""
+    log = data.get("event_log") or []
+    return log[0] if log else None
 
 
 SENSORS: tuple[CompalSensorDescription, ...] = (
@@ -157,6 +184,95 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         icon="mdi:chip",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("system"), "software_version", None),
+    ),
+    CompalSensorDescription(
+        key="upstream_power_max",
+        translation_key="upstream_power_max",
+        icon="mdi:signal",
+        native_unit_of_measurement="dBmV",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (d.get("signal") or {}).get("upstream_power_max"),
+        attr_fn=_upstream_attrs,
+    ),
+    CompalSensorDescription(
+        key="t3_timeouts",
+        translation_key="t3_timeouts",
+        icon="mdi:timer-alert-outline",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement="timeouts",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (d.get("signal") or {}).get("t3_timeouts"),
+    ),
+    CompalSensorDescription(
+        key="t4_timeouts",
+        translation_key="t4_timeouts",
+        icon="mdi:timer-alert",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement="timeouts",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (d.get("signal") or {}).get("t4_timeouts"),
+    ),
+    CompalSensorDescription(
+        key="gateway_ip",
+        translation_key="gateway_ip",
+        icon="mdi:ip-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("lan"), "lan_ip", None),
+    ),
+    CompalSensorDescription(
+        key="ipv6_prefix",
+        translation_key="ipv6_prefix",
+        icon="mdi:ip-network-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (
+            f"{getattr(d.get('ipv6'), 'prefix_address', None)}/"
+            f"{getattr(d.get('ipv6'), 'prefix_length', None)}"
+            if getattr(d.get("ipv6"), "prefix_address", None)
+            else None
+        ),
+    ),
+    CompalSensorDescription(
+        key="wifi_2g_ssid",
+        translation_key="wifi_2g_ssid",
+        icon="mdi:wifi",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: _wifi_cfg(d, _BAND_2G, "ssid"),
+        attr_fn=lambda d: {
+            "channel": _wifi_cfg(d, _BAND_2G, "channel_number"),
+            "channel_width": _wifi_cfg(d, _BAND_2G, "channel_width"),
+            "security": _wifi_cfg(d, _BAND_2G, "security_type"),
+        },
+    ),
+    CompalSensorDescription(
+        key="wifi_5g_ssid",
+        translation_key="wifi_5g_ssid",
+        icon="mdi:wifi",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: _wifi_cfg(d, _BAND_5G, "ssid"),
+        attr_fn=lambda d: {
+            "channel": _wifi_cfg(d, _BAND_5G, "channel_number"),
+            "channel_width": _wifi_cfg(d, _BAND_5G, "channel_width"),
+            "security": _wifi_cfg(d, _BAND_5G, "security_type"),
+        },
+    ),
+    CompalSensorDescription(
+        key="last_event",
+        translation_key="last_event",
+        icon="mdi:message-alert-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (
+            (_last_event(d).message or "")[:255] if _last_event(d) else None
+        ),
+        attr_fn=lambda d: (
+            {
+                "time": _last_event(d).time,
+                "priority": _last_event(d).priority,
+                "event_count": len(d.get("event_log") or []),
+            }
+            if _last_event(d)
+            else {}
+        ),
     ),
 )
 

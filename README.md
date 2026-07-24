@@ -26,20 +26,29 @@ A single **Ziggo Cable Gateway** device with:
 - Uptime (as a boot timestamp)
 - Connected devices count
 - Downstream power (min) and SNR (min)
-- Downstream / upstream channel counts
+- Upstream power (max)
+- Downstream / upstream channel counts (with locked-channel counts as attributes)
 - Corrected and uncorrected error counters
+- **T3 and T4 timeout counters** (upstream line-health indicators)
 - Provisioned download / upload speed (your plan's rate caps, from the DOCSIS
   service flows)
 - Firmware version
+- Gateway LAN IP and IPv6 delegated prefix
+- Wi-Fi 2.4 GHz / 5 GHz SSID (with channel, width and security as attributes)
+- **Last event** — the newest cable-modem event-log line, with its timestamp,
+  priority and total event count as attributes
 
 **Binary sensors**
 - Modem operational (connectivity)
+- Registration complete and Downstream locked
+- Baseline privacy (BPI+)
 - Bridge mode
 - Wi-Fi 2.4 GHz and Wi-Fi 5 GHz up/down
 
 **Device trackers**
 - One per device seen in the gateway's DHCP/association table, for presence
-  detection (with IP, hostname, interface, Wi-Fi band as attributes).
+  detection (with IP, hostname, device type, interface, Wi-Fi band, RSSI, link
+  speed, IPv6 and DHCP lease time as attributes).
 - Like other router integrations (FRITZ!Box, UniFi, …), these trackers are
   **disabled by default**. Home Assistant automatically enables a tracker for a
   device it already knows (one whose MAC matches an existing device); enable any
@@ -50,12 +59,13 @@ A single **Ziggo Cable Gateway** device with:
 
 ## How it handles the single-session gateway
 
-The F3896LG allows **exactly one authenticated session** and has **no logout
-endpoint**. This integration logs in, reads everything in one burst, and drops
-its token every polling cycle (every 5 minutes), so the gateway's own web UI
-stays usable between polls. Successful logins never count toward the lockout, so
-the regular cadence is safe. If the web UI is open when a poll runs, the
-integration keeps the last-known values instead of flapping every entity to
+The F3896LG allows **exactly one authenticated session**. This integration logs
+in, reads everything in one burst, and then **logs out** (`DELETE
+/user/<id>/token/<token>`) every polling cycle (every 5 minutes), so the
+gateway's single session is freed immediately and its web UI stays usable
+between polls. Successful logins never count toward the lockout, so the regular
+cadence is safe. If the web UI is open (holding the session) when a poll runs,
+the integration keeps the last-known values instead of flapping every entity to
 *unavailable*.
 
 Built on the [`compalf3896lg`](https://github.com/AboveColin/compalf3896lg)

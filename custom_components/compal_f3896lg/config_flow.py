@@ -59,7 +59,9 @@ async def _validate(hass, host: str, password: str) -> str:
     except CompalError as err:
         raise CannotConnect(str(err)) from err
     finally:
-        client.auth.clear()
+        # Release the single session slot right away so the next step (or the
+        # coordinator's first refresh) can log in without contention.
+        await client.logout()
 
     model = getattr(info, "model_name", None)
     return f"Ziggo Gateway ({model})" if model else "Ziggo Cable Gateway"

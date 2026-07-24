@@ -46,7 +46,7 @@ class CompalRebootButton(CompalEntity, ButtonEntity):
         super().__init__(coordinator, entry_id, "reboot")
 
     async def async_press(self) -> None:
-        """Log in and issue a reboot, then drop the session token."""
+        """Log in, issue a reboot, then release the session slot."""
         client = self.coordinator.client
         try:
             await client.login()
@@ -54,4 +54,4 @@ class CompalRebootButton(CompalEntity, ButtonEntity):
         except CompalError as err:
             raise HomeAssistantError(f"Could not reboot the gateway: {err}") from err
         finally:
-            client.auth.clear()
+            await client.logout()
