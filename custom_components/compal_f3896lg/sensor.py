@@ -348,6 +348,89 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         ),
         attr_fn=lambda d: {"provisioned": len(d.get("mta_lines") or [])},
     ),
+    CompalSensorDescription(
+        key="wan_gateway",
+        translation_key="wan_gateway",
+        icon="mdi:router-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("provisioning"), "ipv4_gateway", None),
+    ),
+    CompalSensorDescription(
+        key="wan_ipv6",
+        translation_key="wan_ipv6",
+        icon="mdi:ip-network-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("provisioning"), "ipv6_global_address", None),
+    ),
+    CompalSensorDescription(
+        key="wan_lease_time",
+        translation_key="wan_lease_time",
+        icon="mdi:timer-sand",
+        native_unit_of_measurement="s",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("provisioning"), "ipv4_lease_time", None),
+    ),
+    CompalSensorDescription(
+        key="dhcp_pool",
+        translation_key="dhcp_pool",
+        icon="mdi:ip-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (
+            f"{d['dhcp'].min_address} – {d['dhcp'].max_address}"
+            if d.get("dhcp") and d["dhcp"].min_address
+            else None
+        ),
+        attr_fn=lambda d: (
+            {
+                "lease_time_seconds": d["dhcp"].lease_time,
+                "subnet_mask": d["dhcp"].subnet_mask,
+                "enabled": d["dhcp"].enabled,
+            }
+            if d.get("dhcp")
+            else {}
+        ),
+    ),
+    CompalSensorDescription(
+        key="wifi_2g_channel",
+        translation_key="wifi_2g_channel",
+        icon="mdi:wifi-settings",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: _wifi_cfg(d, _BAND_2G, "channel_number"),
+    ),
+    CompalSensorDescription(
+        key="wifi_5g_channel",
+        translation_key="wifi_5g_channel",
+        icon="mdi:wifi-settings",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: _wifi_cfg(d, _BAND_5G, "channel_number"),
+    ),
+    CompalSensorDescription(
+        key="mac_filters",
+        translation_key="mac_filters",
+        icon="mdi:filter",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="rules",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get("mac_filters") or []),
+    ),
+    CompalSensorDescription(
+        key="port_triggers",
+        translation_key="port_triggers",
+        icon="mdi:filter-variant",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="rules",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get("port_triggers") or []),
+    ),
+    CompalSensorDescription(
+        key="ip_port_filters",
+        translation_key="ip_port_filters",
+        icon="mdi:filter-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="rules",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get("ip_port_filters") or []),
+    ),
 )
 
 async def async_setup_entry(

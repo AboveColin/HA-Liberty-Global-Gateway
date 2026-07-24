@@ -64,7 +64,16 @@
       "software_update_status": { "name": "Software update status" },
       "port_forward_rules": { "name": "Port forwarding rules" },
       "dhcp_reservations": { "name": "DHCP reservations" },
-      "telephony_lines": { "name": "Telephony lines active" }
+      "telephony_lines": { "name": "Telephony lines active" },
+      "wan_gateway": { "name": "WAN gateway" },
+      "wan_ipv6": { "name": "WAN IPv6 address" },
+      "wan_lease_time": { "name": "WAN lease time" },
+      "dhcp_pool": { "name": "DHCP address pool" },
+      "wifi_2g_channel": { "name": "Wi-Fi 2.4 GHz channel" },
+      "wifi_5g_channel": { "name": "Wi-Fi 5 GHz channel" },
+      "mac_filters": { "name": "MAC filter rules" },
+      "port_triggers": { "name": "Port trigger rules" },
+      "ip_port_filters": { "name": "IP/port filter rules" }
     },
     "binary_sensor": {
       "modem_operational": { "name": "Modem operational" },
@@ -79,10 +88,20 @@
       "firewall": { "name": "Firewall" },
       "smart_wifi": { "name": "Smart Wi-Fi (band steering)" },
       "guest_wifi_2g": { "name": "Guest Wi-Fi 2.4 GHz" },
-      "guest_wifi_5g": { "name": "Guest Wi-Fi 5 GHz" }
+      "guest_wifi_5g": { "name": "Guest Wi-Fi 5 GHz" },
+      "wps_2g": { "name": "WPS 2.4 GHz" },
+      "wps_5g": { "name": "WPS 5 GHz" },
+      "dslite": { "name": "DS-Lite" }
     },
     "button": {
       "reboot": { "name": "Reboot gateway" }
+    },
+    "switch": {
+      "upnp_switch": { "name": "UPnP" },
+      "led_auto": { "name": "LED automatic brightness" }
+    },
+    "number": {
+      "led_brightness": { "name": "LED brightness" }
     }
   }
 }

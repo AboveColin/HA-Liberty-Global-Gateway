@@ -58,6 +58,10 @@ A single **Ziggo Cable Gateway** device with:
   device it already knows (one whose MAC matches an existing device); enable any
   others you want to track under **Settings → Devices & services → Entities**.
 
+**Switches & controls**
+- **UPnP** on/off, **LED automatic brightness** on/off, and **LED brightness**
+  (0-100). Connectivity-safe only — no Wi-Fi radio or bridge-mode toggles.
+
 **Button**
 - Reboot gateway (drops the WAN for a minute or two — a deliberate action).
 
