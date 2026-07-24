@@ -58,7 +58,12 @@
       "ipv6_prefix": { "name": "IPv6 delegated prefix" },
       "wifi_2g_ssid": { "name": "Wi-Fi 2.4 GHz SSID" },
       "wifi_5g_ssid": { "name": "Wi-Fi 5 GHz SSID" },
-      "last_event": { "name": "Last event" }
+      "last_event": { "name": "Last event" },
+      "wan_ip": { "name": "WAN IP address" },
+      "software_update_status": { "name": "Software update status" },
+      "port_forward_rules": { "name": "Port forwarding rules" },
+      "dhcp_reservations": { "name": "DHCP reservations" },
+      "telephony_lines": { "name": "Telephony lines active" }
     },
     "binary_sensor": {
       "modem_operational": { "name": "Modem operational" },
@@ -67,7 +72,13 @@
       "wifi_5g": { "name": "Wi-Fi 5 GHz" },
       "baseline_privacy": { "name": "Baseline privacy (BPI+)" },
       "registration_complete": { "name": "Registration complete" },
-      "downstream_locked": { "name": "Downstream locked" }
+      "downstream_locked": { "name": "Downstream locked" },
+      "upnp": { "name": "UPnP" },
+      "dmz": { "name": "DMZ" },
+      "firewall": { "name": "Firewall" },
+      "smart_wifi": { "name": "Smart Wi-Fi (band steering)" },
+      "guest_wifi_2g": { "name": "Guest Wi-Fi 2.4 GHz" },
+      "guest_wifi_5g": { "name": "Guest Wi-Fi 5 GHz" }
     },
     "button": {
       "reboot": { "name": "Reboot gateway" }
