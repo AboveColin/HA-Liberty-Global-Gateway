@@ -130,6 +130,27 @@ BINARY_SENSORS: tuple[CompalBinaryDescription, ...] = (
         value_fn=lambda d: getattr((d.get("guest_wifi") or {}).get("band5g"), "enabled", None),
         attr_fn=lambda d: {"ssid": getattr((d.get("guest_wifi") or {}).get("band5g"), "ssid", None)},
     ),
+    CompalBinaryDescription(
+        key="wps_2g",
+        translation_key="wps_2g",
+        icon="mdi:wifi-refresh",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (d.get("wps") or {}).get("band2g"),
+    ),
+    CompalBinaryDescription(
+        key="wps_5g",
+        translation_key="wps_5g",
+        icon="mdi:wifi-refresh",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: (d.get("wps") or {}).get("band5g"),
+    ),
+    CompalBinaryDescription(
+        key="dslite",
+        translation_key="dslite",
+        icon="mdi:ip-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("provisioning"), "dslite_enabled", None),
+    ),
 )
 
 

@@ -34,6 +34,8 @@ PLATFORMS = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
     Platform.DEVICE_TRACKER,
+    Platform.SWITCH,
+    Platform.NUMBER,
 ]
 
 # The gateway allows a single session and frees the slot only after the token
@@ -100,6 +102,17 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
             reserved_ips = await self._safe(
                 self.client.get_reserved_ips(), default=[])
             mta_lines = await self._safe(self.client.get_mta_lines(), default=[])
+            led = await self._safe(self.client.get_led())
+            dhcp = await self._safe(self.client.get_dhcp("ipv4"))
+            wps = {
+                "band2g": await self._safe(self.client.get_wps_enabled("band2g")),
+                "band5g": await self._safe(self.client.get_wps_enabled("band5g")),
+            }
+            mac_filters = await self._safe(self.client.get_mac_filters(), default=[])
+            port_triggers = await self._safe(
+                self.client.get_port_triggers(), default=[])
+            ip_port_filters = await self._safe(
+                self.client.get_ip_port_filters(), default=[])
         except (CompalLockoutError, CompalAuthError) as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except CompalSessionBusyError as err:
@@ -141,6 +154,12 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
             "port_forwarding": port_forwarding or [],
             "reserved_ips": reserved_ips or [],
             "mta_lines": mta_lines or [],
+            "led": led,
+            "dhcp": dhcp,
+            "wps": wps,
+            "mac_filters": mac_filters or [],
+            "port_triggers": port_triggers or [],
+            "ip_port_filters": ip_port_filters or [],
             "signal": _signal_stats(downstream, upstream),
             "plan": _plan_rates(service_flows),
         }
