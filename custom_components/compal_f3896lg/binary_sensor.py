@@ -63,6 +63,27 @@ BINARY_SENSORS: tuple[CompalBinaryDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_wifi_up("band5g"),
     ),
+    CompalBinaryDescription(
+        key="baseline_privacy",
+        translation_key="baseline_privacy",
+        icon="mdi:lock-check",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("cable"), "baseline_privacy_enabled", None),
+    ),
+    CompalBinaryDescription(
+        key="registration_complete",
+        translation_key="registration_complete",
+        icon="mdi:check-decagram",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("registration"), "registration_complete", None),
+    ),
+    CompalBinaryDescription(
+        key="downstream_locked",
+        translation_key="downstream_locked",
+        icon="mdi:lock",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("registration"), "downstream_locked", None),
+    ),
 )
 
 

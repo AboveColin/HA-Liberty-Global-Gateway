@@ -20,6 +20,7 @@ try:
         CompalAuthError,
         CompalError,
         CompalLockoutError,
+        CompalNetworkError,
         CompalSessionBusyError,
     )
 except ImportError as err:  # pragma: no cover - handled by manifest requirements
@@ -67,7 +68,25 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
             upstream = await self.client.get_upstream_channels()
             service_flows = await self.client.get_service_flows()
             wifi_states = await self.client.get_wifi_states()
-            hosts = await self.client.get_hosts(connected_only=False)
+            try:
+                hosts = await self.client.get_hosts(connected_only=False)
+            except CompalNetworkError as err:
+                # The hosts table is the slowest endpoint; if it blips, keep the
+                # previous list rather than dropping every device_tracker.
+                prev_hosts = (self.data or {}).get("hosts")
+                if prev_hosts is None:
+                    raise
+                _LOGGER.debug("hosts read failed (%s); keeping previous list", err)
+                hosts = prev_hosts
+            # Supplementary reads — best effort, so firmware that lacks any of
+            # them never breaks the whole poll.
+            lan = await self._safe(self.client.get_lan_info())
+            ipv6 = await self._safe(self.client.get_ipv6_info())
+            wifi_configs = await self._safe(
+                self.client.get_wifi_configs(), default={}
+            )
+            registration = await self._safe(self.client.get_registration())
+            event_log = await self._safe(self.client.get_event_log(), default=[])
         except (CompalLockoutError, CompalAuthError) as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except CompalSessionBusyError as err:
@@ -80,8 +99,10 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
         except CompalError as err:
             raise UpdateFailed(f"Error communicating with the gateway: {err}") from err
         finally:
-            # Drop the bearer token so the router frees its single session slot.
-            self.client.auth.clear()
+            # Log out so the router frees its single session slot immediately
+            # (DELETE /user/<id>/token/<token>) — the web UI stays usable and we
+            # never wait for the idle timeout. Best effort inside the library.
+            await self.client.logout()
 
         return {
             "system": system,
@@ -91,10 +112,23 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
             "upstream": upstream,
             "service_flows": service_flows,
             "wifi_states": wifi_states,
+            "wifi_configs": wifi_configs or {},
             "hosts": hosts,
+            "lan": lan,
+            "ipv6": ipv6,
+            "registration": registration,
+            "event_log": event_log or [],
             "signal": _signal_stats(downstream, upstream),
             "plan": _plan_rates(service_flows),
         }
+
+    async def _safe(self, coro, default=None):
+        """Await an optional read, returning ``default`` if the endpoint fails."""
+        try:
+            return await coro
+        except CompalError as err:
+            _LOGGER.debug("optional gateway read failed: %s", err)
+            return default
 
 
 def _is_sc_qam(channel) -> bool:
@@ -117,14 +151,27 @@ def _signal_stats(downstream: list, upstream: list) -> dict:
     snrs = [c.snr for c in qam if c.snr is not None]
     corrected = sum(c.corrected_errors or 0 for c in downstream)
     uncorrected = sum(c.uncorrected_errors or 0 for c in downstream)
+    # Upstream: OFDMA channels report power on a different scale than the SC-QAM
+    # (ATDMA) channels (observed ~330 vs ~40), so restrict to non-OFDMA here.
+    up_powers = [
+        c.power for c in upstream
+        if c.power is not None and "ofdma" not in (c.channel_type or "").lower()
+    ]
     return {
         "downstream_channels": len(downstream),
         "upstream_channels": len(upstream),
         "downstream_power_min": min(powers) if powers else None,
         "downstream_power_max": max(powers) if powers else None,
         "downstream_snr_min": min(snrs) if snrs else None,
+        "upstream_power_min": min(up_powers) if up_powers else None,
+        "upstream_power_max": max(up_powers) if up_powers else None,
         "corrected_errors": corrected,
         "uncorrected_errors": uncorrected,
+        # Line-health counters: T3/T4 timeouts and how many channels are locked.
+        "t3_timeouts": sum(c.t3_timeout or 0 for c in upstream),
+        "t4_timeouts": sum(c.t4_timeout or 0 for c in upstream),
+        "downstream_locked": sum(1 for c in downstream if c.lock_status),
+        "upstream_locked": sum(1 for c in upstream if c.lock_status),
     }
 
 

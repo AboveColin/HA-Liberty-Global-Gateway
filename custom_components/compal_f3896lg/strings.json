@@ -50,13 +50,24 @@
       "uncorrected_errors": { "name": "Uncorrected errors" },
       "download_speed": { "name": "Provisioned download speed" },
       "upload_speed": { "name": "Provisioned upload speed" },
-      "firmware": { "name": "Firmware version" }
+      "firmware": { "name": "Firmware version" },
+      "upstream_power_max": { "name": "Upstream power (max)" },
+      "t3_timeouts": { "name": "T3 timeouts" },
+      "t4_timeouts": { "name": "T4 timeouts" },
+      "gateway_ip": { "name": "Gateway LAN IP" },
+      "ipv6_prefix": { "name": "IPv6 delegated prefix" },
+      "wifi_2g_ssid": { "name": "Wi-Fi 2.4 GHz SSID" },
+      "wifi_5g_ssid": { "name": "Wi-Fi 5 GHz SSID" },
+      "last_event": { "name": "Last event" }
     },
     "binary_sensor": {
       "modem_operational": { "name": "Modem operational" },
       "bridge_mode": { "name": "Bridge mode" },
       "wifi_2g": { "name": "Wi-Fi 2.4 GHz" },
-      "wifi_5g": { "name": "Wi-Fi 5 GHz" }
+      "wifi_5g": { "name": "Wi-Fi 5 GHz" },
+      "baseline_privacy": { "name": "Baseline privacy (BPI+)" },
+      "registration_complete": { "name": "Registration complete" },
+      "downstream_locked": { "name": "Downstream locked" }
     },
     "button": {
       "reboot": { "name": "Reboot gateway" }
