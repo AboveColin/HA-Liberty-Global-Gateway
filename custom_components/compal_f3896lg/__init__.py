@@ -97,10 +97,24 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
         }
 
 
+def _is_sc_qam(channel) -> bool:
+    """Return True for SC-QAM downstream channels (not OFDM)."""
+    channel_type = (channel.channel_type or "").lower()
+    if channel_type:
+        return channel_type == "sc_qam"
+    # Fall back to the SNR signal: SC-QAM channels report SNR, OFDM ones don't.
+    return channel.snr is not None
+
+
 def _signal_stats(downstream: list, upstream: list) -> dict:
     """Aggregate per-channel DOCSIS figures into a few headline numbers."""
-    powers = [c.power for c in downstream if c.power is not None]
-    snrs = [c.snr for c in downstream if c.snr is not None]
+    # OFDM (DOCSIS 3.1) channels report received power on a different scale than
+    # the SC-QAM channels — often well over 100 "dBmV" — and expose no SNR, so
+    # the headline power/SNR figures cover the SC-QAM channels only to stay in a
+    # comparable, meaningful dBmV range.
+    qam = [c for c in downstream if _is_sc_qam(c)]
+    powers = [c.power for c in qam if c.power is not None]
+    snrs = [c.snr for c in qam if c.snr is not None]
     corrected = sum(c.corrected_errors or 0 for c in downstream)
     uncorrected = sum(c.uncorrected_errors or 0 for c in downstream)
     return {

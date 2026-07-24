@@ -40,6 +40,10 @@ A single **Ziggo Cable Gateway** device with:
 **Device trackers**
 - One per device seen in the gateway's DHCP/association table, for presence
   detection (with IP, hostname, interface, Wi-Fi band as attributes).
+- Like other router integrations (FRITZ!Box, UniFi, …), these trackers are
+  **disabled by default**. Home Assistant automatically enables a tracker for a
+  device it already knows (one whose MAC matches an existing device); enable any
+  others you want to track under **Settings → Devices & services → Entities**.
 
 **Button**
 - Reboot gateway (drops the WAN for a minute or two — a deliberate action).
