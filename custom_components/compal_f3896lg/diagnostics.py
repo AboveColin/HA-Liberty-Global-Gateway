@@ -76,6 +76,28 @@ async def async_get_config_entry_diagnostics(
             for band, cfg in (cdata.get("wifi_configs") or {}).items()
         }
         info["registration"] = _model_dump(cdata.get("registration"))
+        # Provisioning carries the public IP + WAN MAC; report only safe shape.
+        prov = cdata.get("provisioning")
+        info["provisioning"] = (
+            {
+                "mode": prov.mode,
+                "ipv4_present": bool(prov.ipv4_address),
+                "ipv6_present": bool(prov.ipv6_global_address),
+                "ipv4_lease_time": prov.ipv4_lease_time,
+            }
+            if prov
+            else None
+        )
+        info["software_update"] = _model_dump(cdata.get("software_update"))
+        info["features"] = {
+            "upnp": cdata.get("upnp"),
+            "smart_wifi": cdata.get("smart_wifi"),
+            "dmz": getattr(cdata.get("dmz"), "enabled", None),
+            "firewall": getattr(cdata.get("firewall"), "enabled", None),
+            "port_forward_rules": len(cdata.get("port_forwarding") or []),
+            "dhcp_reservations": len(cdata.get("reserved_ips") or []),
+            "telephony_lines": len(cdata.get("mta_lines") or []),
+        }
         info["signal"] = cdata.get("signal")
         info["plan"] = cdata.get("plan")
         info["host_count"] = len(cdata.get("hosts") or [])

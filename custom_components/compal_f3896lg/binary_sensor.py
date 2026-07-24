@@ -33,6 +33,7 @@ class CompalBinaryDescription(BinarySensorEntityDescription):
     """Describes a Compal binary sensor and how to read its state."""
 
     value_fn: Callable[[dict], bool | None]
+    attr_fn: Callable[[dict], dict] | None = None
 
 
 BINARY_SENSORS: tuple[CompalBinaryDescription, ...] = (
@@ -84,6 +85,51 @@ BINARY_SENSORS: tuple[CompalBinaryDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("registration"), "downstream_locked", None),
     ),
+    CompalBinaryDescription(
+        key="upnp",
+        translation_key="upnp",
+        icon="mdi:upload-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.get("upnp"),
+    ),
+    CompalBinaryDescription(
+        key="dmz",
+        translation_key="dmz",
+        device_class=BinarySensorDeviceClass.SAFETY,
+        icon="mdi:security-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("dmz"), "enabled", None),
+    ),
+    CompalBinaryDescription(
+        key="firewall",
+        translation_key="firewall",
+        icon="mdi:shield-check",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("firewall"), "enabled", None),
+    ),
+    CompalBinaryDescription(
+        key="smart_wifi",
+        translation_key="smart_wifi",
+        icon="mdi:wifi-cog",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.get("smart_wifi"),
+    ),
+    CompalBinaryDescription(
+        key="guest_wifi_2g",
+        translation_key="guest_wifi_2g",
+        icon="mdi:wifi-lock-open",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr((d.get("guest_wifi") or {}).get("band2g"), "enabled", None),
+        attr_fn=lambda d: {"ssid": getattr((d.get("guest_wifi") or {}).get("band2g"), "ssid", None)},
+    ),
+    CompalBinaryDescription(
+        key="guest_wifi_5g",
+        translation_key="guest_wifi_5g",
+        icon="mdi:wifi-lock-open",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr((d.get("guest_wifi") or {}).get("band5g"), "enabled", None),
+        attr_fn=lambda d: {"ssid": getattr((d.get("guest_wifi") or {}).get("band5g"), "ssid", None)},
+    ),
 )
 
 
@@ -121,3 +167,10 @@ class CompalBinarySensor(CompalEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return the current binary state."""
         return self.entity_description.value_fn(self.coordinator.data or {})
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Return extra attributes if the description defines them."""
+        if self.entity_description.attr_fn is None:
+            return None
+        return self.entity_description.attr_fn(self.coordinator.data or {})

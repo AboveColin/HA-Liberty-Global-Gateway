@@ -32,16 +32,20 @@ A single **Ziggo Cable Gateway** device with:
 - **T3 and T4 timeout counters** (upstream line-health indicators)
 - Provisioned download / upload speed (your plan's rate caps, from the DOCSIS
   service flows)
-- Firmware version
+- Firmware version and **software-update status**
+- **WAN IP address** (public IPv4, with gateway, DNS, IPv6 and lease as attributes)
 - Gateway LAN IP and IPv6 delegated prefix
 - Wi-Fi 2.4 GHz / 5 GHz SSID (with channel, width and security as attributes)
 - **Last event** — the newest cable-modem event-log line, with its timestamp,
   priority and total event count as attributes
+- Port-forwarding rule count, DHCP reservation count, and active telephony lines
 
 **Binary sensors**
 - Modem operational (connectivity)
 - Registration complete and Downstream locked
 - Baseline privacy (BPI+)
+- **Firewall**, **DMZ** and **UPnP** state (security at a glance)
+- **Smart Wi-Fi** (band steering); Guest Wi-Fi 2.4/5 GHz (SSID as attribute)
 - Bridge mode
 - Wi-Fi 2.4 GHz and Wi-Fi 5 GHz up/down
 

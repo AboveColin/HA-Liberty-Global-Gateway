@@ -87,6 +87,19 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
             )
             registration = await self._safe(self.client.get_registration())
             event_log = await self._safe(self.client.get_event_log(), default=[])
+            provisioning = await self._safe(self.client.get_provisioning())
+            software_update = await self._safe(self.client.get_software_update())
+            upnp = await self._safe(self.client.get_upnp())
+            dmz = await self._safe(self.client.get_dmz())
+            firewall = await self._safe(self.client.get_firewall("ipv4"))
+            smart_wifi = await self._safe(self.client.get_smart_wifi())
+            guest_wifi = await self._safe(
+                self.client.get_guest_wifi_configs(), default={})
+            port_forwarding = await self._safe(
+                self.client.get_port_forwarding(), default=[])
+            reserved_ips = await self._safe(
+                self.client.get_reserved_ips(), default=[])
+            mta_lines = await self._safe(self.client.get_mta_lines(), default=[])
         except (CompalLockoutError, CompalAuthError) as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except CompalSessionBusyError as err:
@@ -118,6 +131,16 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
             "ipv6": ipv6,
             "registration": registration,
             "event_log": event_log or [],
+            "provisioning": provisioning,
+            "software_update": software_update,
+            "upnp": upnp,
+            "dmz": dmz,
+            "firewall": firewall,
+            "smart_wifi": smart_wifi,
+            "guest_wifi": guest_wifi or {},
+            "port_forwarding": port_forwarding or [],
+            "reserved_ips": reserved_ips or [],
+            "mta_lines": mta_lines or [],
             "signal": _signal_stats(downstream, upstream),
             "plan": _plan_rates(service_flows),
         }

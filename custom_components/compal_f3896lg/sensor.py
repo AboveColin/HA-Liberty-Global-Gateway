@@ -77,6 +77,19 @@ def _last_event(data: dict):
     return log[0] if log else None
 
 
+def _wan_attrs(data: dict) -> dict[str, Any]:
+    p = data.get("provisioning")
+    if p is None:
+        return {}
+    return {
+        "gateway": p.ipv4_gateway,
+        "dns_servers": p.ipv4_dns,
+        "ipv6_address": p.ipv6_global_address,
+        "lease_time_seconds": p.ipv4_lease_time,
+        "mode": p.mode,
+    }
+
+
 SENSORS: tuple[CompalSensorDescription, ...] = (
     CompalSensorDescription(
         key="docsis_status",
@@ -273,6 +286,54 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             if _last_event(d)
             else {}
         ),
+    ),
+    CompalSensorDescription(
+        key="wan_ip",
+        translation_key="wan_ip",
+        icon="mdi:wan",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("provisioning"), "ipv4_address", None),
+        attr_fn=_wan_attrs,
+    ),
+    CompalSensorDescription(
+        key="software_update_status",
+        translation_key="software_update_status",
+        icon="mdi:package-up",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: getattr(d.get("software_update"), "status", None),
+    ),
+    CompalSensorDescription(
+        key="port_forward_rules",
+        translation_key="port_forward_rules",
+        icon="mdi:arrow-decision",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="rules",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get("port_forwarding") or []),
+        attr_fn=lambda d: {
+            "enabled": sum(1 for r in (d.get("port_forwarding") or []) if r.enabled)
+        },
+    ),
+    CompalSensorDescription(
+        key="dhcp_reservations",
+        translation_key="dhcp_reservations",
+        icon="mdi:ip-network-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="reservations",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get("reserved_ips") or []),
+    ),
+    CompalSensorDescription(
+        key="telephony_lines",
+        translation_key="telephony_lines",
+        icon="mdi:phone",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="lines",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: sum(
+            1 for line in (d.get("mta_lines") or []) if line.operational
+        ),
+        attr_fn=lambda d: {"provisioned": len(d.get("mta_lines") or [])},
     ),
 )
 
