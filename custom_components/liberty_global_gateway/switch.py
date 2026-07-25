@@ -1,4 +1,4 @@
-"""Switch platform for the Compal / Sagemcom F3896LG integration."""
+"""Switch platform for the Liberty Global cable gateway integration."""
 
 from __future__ import annotations
 
@@ -14,27 +14,27 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from compalf3896lg import CompalClient
-from compalf3896lg.exceptions import CompalError
+from liberty_global_gateway import LibertyGatewayClient
+from liberty_global_gateway.exceptions import GatewayError
 
-from . import CompalDataUpdateCoordinator
+from . import GatewayDataUpdateCoordinator
 from .const import DOMAIN
-from .entity import CompalEntity
+from .entity import GatewayEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
-class CompalSwitchDescription(SwitchEntityDescription):
-    """Describes a Compal switch: how to read it and how to set it."""
+class GatewaySwitchDescription(SwitchEntityDescription):
+    """Describes a gateway switch: how to read it and how to set it."""
 
     value_fn: Callable[[dict], bool | None]
-    set_fn: Callable[[CompalClient, bool], Awaitable[None]]
+    set_fn: Callable[[LibertyGatewayClient, bool], Awaitable[None]]
 
 
 # Only connectivity-safe toggles: nothing here can drop your internet or Wi-Fi.
-SWITCHES: tuple[CompalSwitchDescription, ...] = (
-    CompalSwitchDescription(
+SWITCHES: tuple[GatewaySwitchDescription, ...] = (
+    GatewaySwitchDescription(
         key="upnp",
         translation_key="upnp_switch",
         icon="mdi:upload-network",
@@ -42,7 +42,7 @@ SWITCHES: tuple[CompalSwitchDescription, ...] = (
         value_fn=lambda d: d.get("upnp"),
         set_fn=lambda client, on: client.set_upnp(on),
     ),
-    CompalSwitchDescription(
+    GatewaySwitchDescription(
         key="led_auto",
         translation_key="led_auto",
         icon="mdi:led-on",
@@ -59,25 +59,25 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the switches from a config entry."""
-    coordinator: CompalDataUpdateCoordinator = hass.data[DOMAIN][
+    coordinator: GatewayDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]["coordinator"]
     async_add_entities(
-        CompalSwitch(coordinator, config_entry.entry_id, description)
+        GatewaySwitch(coordinator, config_entry.entry_id, description)
         for description in SWITCHES
     )
 
 
-class CompalSwitch(CompalEntity, SwitchEntity):
+class GatewaySwitch(GatewayEntity, SwitchEntity):
     """A writable gateway setting exposed as a switch."""
 
-    entity_description: CompalSwitchDescription
+    entity_description: GatewaySwitchDescription
 
     def __init__(
         self,
-        coordinator: CompalDataUpdateCoordinator,
+        coordinator: GatewayDataUpdateCoordinator,
         entry_id: str,
-        description: CompalSwitchDescription,
+        description: GatewaySwitchDescription,
     ) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, entry_id, description.key)
@@ -93,7 +93,7 @@ class CompalSwitch(CompalEntity, SwitchEntity):
         try:
             await client.login()
             await self.entity_description.set_fn(client, turn_on)
-        except CompalError as err:
+        except GatewayError as err:
             raise HomeAssistantError(
                 f"Could not update {self.entity_description.key}: {err}"
             ) from err

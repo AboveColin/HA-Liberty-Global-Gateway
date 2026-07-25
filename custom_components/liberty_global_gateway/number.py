@@ -1,4 +1,4 @@
-"""Number platform for the Compal / Sagemcom F3896LG integration (LED brightness)."""
+"""Number platform for the Liberty Global cable gateway integration (LED brightness)."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from compalf3896lg.exceptions import CompalError
+from liberty_global_gateway.exceptions import GatewayError
 
-from . import CompalDataUpdateCoordinator
+from . import GatewayDataUpdateCoordinator
 from .const import DOMAIN
-from .entity import CompalEntity
+from .entity import GatewayEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,13 +26,13 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the LED brightness number from a config entry."""
-    coordinator: CompalDataUpdateCoordinator = hass.data[DOMAIN][
+    coordinator: GatewayDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]["coordinator"]
-    async_add_entities([CompalLedBrightness(coordinator, config_entry.entry_id)])
+    async_add_entities([GatewayLedBrightness(coordinator, config_entry.entry_id)])
 
 
-class CompalLedBrightness(CompalEntity, NumberEntity):
+class GatewayLedBrightness(GatewayEntity, NumberEntity):
     """Front-panel LED brightness (0-100)."""
 
     _attr_translation_key = "led_brightness"
@@ -44,7 +44,7 @@ class CompalLedBrightness(CompalEntity, NumberEntity):
     _attr_mode = NumberMode.SLIDER
 
     def __init__(
-        self, coordinator: CompalDataUpdateCoordinator, entry_id: str
+        self, coordinator: GatewayDataUpdateCoordinator, entry_id: str
     ) -> None:
         """Initialize the LED brightness number."""
         super().__init__(coordinator, entry_id, "led_brightness")
@@ -61,7 +61,7 @@ class CompalLedBrightness(CompalEntity, NumberEntity):
         try:
             await client.login()
             await client.set_led(brightness=int(value))
-        except CompalError as err:
+        except GatewayError as err:
             raise HomeAssistantError(f"Could not set LED brightness: {err}") from err
         finally:
             await client.logout()

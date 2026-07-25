@@ -1,4 +1,4 @@
-"""Device tracker platform for the Compal / Sagemcom F3896LG integration.
+"""Device tracker platform for the Liberty Global cable gateway integration.
 
 Every host in the gateway's DHCP/association table becomes a router-source
 ``device_tracker`` entity, so presence detection follows devices joining and
@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import CompalDataUpdateCoordinator
+from . import GatewayDataUpdateCoordinator
 from .const import DOMAIN
 
 
@@ -23,7 +23,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up device trackers, adding new ones as hosts appear."""
-    coordinator: CompalDataUpdateCoordinator = hass.data[DOMAIN][
+    coordinator: GatewayDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]["coordinator"]
     tracked: set[str] = set()
@@ -37,7 +37,7 @@ async def async_setup_entry(
                 continue
             tracked.add(mac)
             new_entities.append(
-                CompalDeviceTracker(coordinator, config_entry.entry_id, mac)
+                GatewayDeviceTracker(coordinator, config_entry.entry_id, mac)
             )
         if new_entities:
             async_add_entities(new_entities)
@@ -46,15 +46,15 @@ async def async_setup_entry(
     _add_new_hosts()
 
 
-class CompalDeviceTracker(
-    CoordinatorEntity[CompalDataUpdateCoordinator], ScannerEntity
+class GatewayDeviceTracker(
+    CoordinatorEntity[GatewayDataUpdateCoordinator], ScannerEntity
 ):
     """Presence for a single host seen by the gateway."""
 
     _attr_has_entity_name = False
 
     def __init__(
-        self, coordinator: CompalDataUpdateCoordinator, entry_id: str, mac: str
+        self, coordinator: GatewayDataUpdateCoordinator, entry_id: str, mac: str
     ) -> None:
         """Initialize the tracker for one MAC address."""
         super().__init__(coordinator)

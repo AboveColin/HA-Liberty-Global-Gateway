@@ -1,4 +1,4 @@
-"""Sensor platform for the Compal / Sagemcom F3896LG integration."""
+"""Sensor platform for the Liberty Global cable gateway integration."""
 
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from . import CompalDataUpdateCoordinator
+from . import GatewayDataUpdateCoordinator
 from .const import DOMAIN
-from .entity import CompalEntity
+from .entity import GatewayEntity
 
 
 def _boot_time(data: dict) -> datetime | None:
@@ -35,8 +35,8 @@ def _boot_time(data: dict) -> datetime | None:
 
 
 @dataclass(frozen=True, kw_only=True)
-class CompalSensorDescription(SensorEntityDescription):
-    """Describes a Compal sensor and how to read its value."""
+class GatewaySensorDescription(SensorEntityDescription):
+    """Describes a gateway sensor and how to read its value."""
 
     value_fn: Callable[[dict], Any]
     attr_fn: Callable[[dict], dict[str, Any]] | None = None
@@ -90,8 +90,8 @@ def _wan_attrs(data: dict) -> dict[str, Any]:
     }
 
 
-SENSORS: tuple[CompalSensorDescription, ...] = (
-    CompalSensorDescription(
+SENSORS: tuple[GatewaySensorDescription, ...] = (
+    GatewaySensorDescription(
         key="docsis_status",
         translation_key="docsis_status",
         icon="mdi:transit-connection-variant",
@@ -101,7 +101,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             "service_status": getattr(d.get("cable"), "service_status", None),
         },
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="uptime",
         translation_key="uptime",
         icon="mdi:clock-start",
@@ -109,7 +109,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_boot_time,
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="connected_devices",
         translation_key="connected_devices",
         icon="mdi:lan-connect",
@@ -117,7 +117,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         native_unit_of_measurement="devices",
         value_fn=lambda d: sum(1 for h in (d.get("hosts") or []) if h.connected),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="downstream_power_min",
         translation_key="downstream_power_min",
         icon="mdi:signal",
@@ -127,7 +127,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         value_fn=lambda d: (d.get("signal") or {}).get("downstream_power_min"),
         attr_fn=_downstream_attrs,
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="downstream_snr_min",
         translation_key="downstream_snr_min",
         icon="mdi:signal-cellular-3",
@@ -137,7 +137,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("signal") or {}).get("downstream_snr_min"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="downstream_channels",
         translation_key="downstream_channels",
         icon="mdi:download-network",
@@ -146,7 +146,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("signal") or {}).get("downstream_channels"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="upstream_channels",
         translation_key="upstream_channels",
         icon="mdi:upload-network",
@@ -155,7 +155,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("signal") or {}).get("upstream_channels"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="corrected_errors",
         translation_key="corrected_errors",
         icon="mdi:alert-circle-check-outline",
@@ -164,7 +164,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("signal") or {}).get("corrected_errors"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="uncorrected_errors",
         translation_key="uncorrected_errors",
         icon="mdi:alert-circle-outline",
@@ -173,7 +173,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("signal") or {}).get("uncorrected_errors"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="download_speed",
         translation_key="download_speed",
         icon="mdi:speedometer",
@@ -182,7 +182,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: (d.get("plan") or {}).get("download_mbps"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="upload_speed",
         translation_key="upload_speed",
         icon="mdi:speedometer-medium",
@@ -191,14 +191,14 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: (d.get("plan") or {}).get("upload_mbps"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="firmware",
         translation_key="firmware",
         icon="mdi:chip",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("system"), "software_version", None),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="upstream_power_max",
         translation_key="upstream_power_max",
         icon="mdi:signal",
@@ -208,7 +208,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         value_fn=lambda d: (d.get("signal") or {}).get("upstream_power_max"),
         attr_fn=_upstream_attrs,
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="t3_timeouts",
         translation_key="t3_timeouts",
         icon="mdi:timer-alert-outline",
@@ -217,7 +217,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("signal") or {}).get("t3_timeouts"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="t4_timeouts",
         translation_key="t4_timeouts",
         icon="mdi:timer-alert",
@@ -226,14 +226,14 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("signal") or {}).get("t4_timeouts"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="gateway_ip",
         translation_key="gateway_ip",
         icon="mdi:ip-network",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("lan"), "lan_ip", None),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="ipv6_prefix",
         translation_key="ipv6_prefix",
         icon="mdi:ip-network-outline",
@@ -245,7 +245,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             else None
         ),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="wifi_2g_ssid",
         translation_key="wifi_2g_ssid",
         icon="mdi:wifi",
@@ -257,7 +257,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             "security": _wifi_cfg(d, _BAND_2G, "security_type"),
         },
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="wifi_5g_ssid",
         translation_key="wifi_5g_ssid",
         icon="mdi:wifi",
@@ -269,7 +269,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             "security": _wifi_cfg(d, _BAND_5G, "security_type"),
         },
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="last_event",
         translation_key="last_event",
         icon="mdi:message-alert-outline",
@@ -287,7 +287,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             else {}
         ),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="wan_ip",
         translation_key="wan_ip",
         icon="mdi:wan",
@@ -295,7 +295,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         value_fn=lambda d: getattr(d.get("provisioning"), "ipv4_address", None),
         attr_fn=_wan_attrs,
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="dns_servers",
         translation_key="dns_servers",
         icon="mdi:dns",
@@ -308,14 +308,14 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             "ipv6": getattr(d.get("provisioning"), "ipv6_dns", []) or [],
         },
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="software_update_status",
         translation_key="software_update_status",
         icon="mdi:package-up",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("software_update"), "status", None),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="port_forward_rules",
         translation_key="port_forward_rules",
         icon="mdi:arrow-decision",
@@ -327,7 +327,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             "enabled": sum(1 for r in (d.get("port_forwarding") or []) if r.enabled)
         },
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="dhcp_reservations",
         translation_key="dhcp_reservations",
         icon="mdi:ip-network-outline",
@@ -336,7 +336,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: len(d.get("reserved_ips") or []),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="telephony_lines",
         translation_key="telephony_lines",
         icon="mdi:phone",
@@ -348,21 +348,21 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         ),
         attr_fn=lambda d: {"provisioned": len(d.get("mta_lines") or [])},
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="wan_gateway",
         translation_key="wan_gateway",
         icon="mdi:router-network",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("provisioning"), "ipv4_gateway", None),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="wan_ipv6",
         translation_key="wan_ipv6",
         icon="mdi:ip-network-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("provisioning"), "ipv6_global_address", None),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="wan_lease_time",
         translation_key="wan_lease_time",
         icon="mdi:timer-sand",
@@ -370,7 +370,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("provisioning"), "ipv4_lease_time", None),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="dhcp_pool",
         translation_key="dhcp_pool",
         icon="mdi:ip-network",
@@ -390,21 +390,21 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
             else {}
         ),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="wifi_2g_channel",
         translation_key="wifi_2g_channel",
         icon="mdi:wifi-settings",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: _wifi_cfg(d, _BAND_2G, "channel_number"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="wifi_5g_channel",
         translation_key="wifi_5g_channel",
         icon="mdi:wifi-settings",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: _wifi_cfg(d, _BAND_5G, "channel_number"),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="mac_filters",
         translation_key="mac_filters",
         icon="mdi:filter",
@@ -413,7 +413,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: len(d.get("mac_filters") or []),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="port_triggers",
         translation_key="port_triggers",
         icon="mdi:filter-variant",
@@ -422,7 +422,7 @@ SENSORS: tuple[CompalSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: len(d.get("port_triggers") or []),
     ),
-    CompalSensorDescription(
+    GatewaySensorDescription(
         key="ip_port_filters",
         translation_key="ip_port_filters",
         icon="mdi:filter-outline",
@@ -438,26 +438,26 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the Compal sensors from a config entry."""
-    coordinator: CompalDataUpdateCoordinator = hass.data[DOMAIN][
+    """Set up the gateway sensors from a config entry."""
+    coordinator: GatewayDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]["coordinator"]
     async_add_entities(
-        CompalSensor(coordinator, config_entry.entry_id, description)
+        GatewaySensor(coordinator, config_entry.entry_id, description)
         for description in SENSORS
     )
 
 
-class CompalSensor(CompalEntity, SensorEntity):
-    """A single Compal gateway sensor."""
+class GatewaySensor(GatewayEntity, SensorEntity):
+    """A single gateway sensor."""
 
-    entity_description: CompalSensorDescription
+    entity_description: GatewaySensorDescription
 
     def __init__(
         self,
-        coordinator: CompalDataUpdateCoordinator,
+        coordinator: GatewayDataUpdateCoordinator,
         entry_id: str,
-        description: CompalSensorDescription,
+        description: GatewaySensorDescription,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, entry_id, description.key)

@@ -1,4 +1,4 @@
-"""Diagnostics support for the Compal / Sagemcom F3896LG integration."""
+"""Diagnostics support for the Liberty Global cable gateway integration."""
 
 from __future__ import annotations
 
