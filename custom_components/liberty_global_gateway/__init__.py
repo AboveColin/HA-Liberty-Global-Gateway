@@ -1,4 +1,4 @@
-"""The Compal F3896LG integration."""
+"""The Liberty Global cable gateway integration."""
 
 from __future__ import annotations
 
@@ -15,16 +15,16 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 _LOGGER = logging.getLogger(__name__)
 
 try:
-    from compalf3896lg import CompalClient
-    from compalf3896lg.exceptions import (
-        CompalAuthError,
-        CompalError,
-        CompalLockoutError,
-        CompalNetworkError,
-        CompalSessionBusyError,
+    from liberty_global_gateway import LibertyGatewayClient
+    from liberty_global_gateway.exceptions import (
+        GatewayAuthError,
+        GatewayError,
+        GatewayLockoutError,
+        GatewayNetworkError,
+        GatewaySessionBusyError,
     )
 except ImportError as err:  # pragma: no cover - handled by manifest requirements
-    _LOGGER.error("Failed to import the compalf3896lg package: %s", err)
+    _LOGGER.error("Failed to import the liberty_global_gateway package: %s", err)
     raise
 
 from .const import CONF_HOST, CONF_PASSWORD, DOMAIN
@@ -45,10 +45,10 @@ PLATFORMS = [
 SCAN_INTERVAL = timedelta(minutes=5)
 
 
-class CompalDataUpdateCoordinator(DataUpdateCoordinator):
+class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
     """Coordinator that logs in, reads a burst and drops the token each cycle."""
 
-    def __init__(self, hass: HomeAssistant, client: CompalClient) -> None:
+    def __init__(self, hass: HomeAssistant, client: LibertyGatewayClient) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass,
@@ -57,11 +57,17 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=SCAN_INTERVAL,
         )
         self.client = client
+        # Operator branding (skin + product name). Static for the life of a
+        # firmware, so it is read once and reused for the device registry name.
+        self.localization = None
 
     async def _async_update_data(self) -> dict:
         """Log in, read the gateway in one burst, then release the session slot."""
         try:
             await self.client.login()
+
+            if self.localization is None:
+                self.localization = await self._safe(self.client.get_localization())
 
             system = await self.client.get_system_info()
             modem_mode = await self.client.get_modem_mode()
@@ -72,7 +78,7 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
             wifi_states = await self.client.get_wifi_states()
             try:
                 hosts = await self.client.get_hosts(connected_only=False)
-            except CompalNetworkError as err:
+            except GatewayNetworkError as err:
                 # The hosts table is the slowest endpoint; if it blips, keep the
                 # previous list rather than dropping every device_tracker.
                 prev_hosts = (self.data or {}).get("hosts")
@@ -113,16 +119,16 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
                 self.client.get_port_triggers(), default=[])
             ip_port_filters = await self._safe(
                 self.client.get_ip_port_filters(), default=[])
-        except (CompalLockoutError, CompalAuthError) as err:
+        except (GatewayLockoutError, GatewayAuthError) as err:
             raise ConfigEntryAuthFailed(str(err)) from err
-        except CompalSessionBusyError as err:
+        except GatewaySessionBusyError as err:
             # The web UI (or a prior client) holds the single session. Keep the
             # last-known values rather than flapping every entity to unavailable.
             if self.data is not None:
                 _LOGGER.debug("Gateway session busy; keeping previous data: %s", err)
                 return self.data
             raise UpdateFailed("Gateway session is busy (close the router web UI)") from err
-        except CompalError as err:
+        except GatewayError as err:
             raise UpdateFailed(f"Error communicating with the gateway: {err}") from err
         finally:
             # Log out so the router frees its single session slot immediately
@@ -168,7 +174,7 @@ class CompalDataUpdateCoordinator(DataUpdateCoordinator):
         """Await an optional read, returning ``default`` if the endpoint fails."""
         try:
             return await coro
-        except CompalError as err:
+        except GatewayError as err:
             _LOGGER.debug("optional gateway read failed: %s", err)
             return default
 
@@ -236,15 +242,15 @@ def _plan_rates(service_flows: list) -> dict:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Compal F3896LG from a config entry."""
+    """Set up a Liberty Global cable gateway from a config entry."""
     session = async_get_clientsession(hass)
-    client = CompalClient(
+    client = LibertyGatewayClient(
         entry.data[CONF_HOST],
         entry.data[CONF_PASSWORD],
         session=session,
     )
 
-    coordinator = CompalDataUpdateCoordinator(hass, client)
+    coordinator = GatewayDataUpdateCoordinator(hass, client)
     try:
         await coordinator.async_config_entry_first_refresh()
     except ConfigEntryAuthFailed:

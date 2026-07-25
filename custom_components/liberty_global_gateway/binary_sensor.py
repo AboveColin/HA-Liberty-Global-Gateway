@@ -1,4 +1,4 @@
-"""Binary sensor platform for the Compal / Sagemcom F3896LG integration."""
+"""Binary sensor platform for the Liberty Global cable gateway integration."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import CompalDataUpdateCoordinator
+from . import GatewayDataUpdateCoordinator
 from .const import DOMAIN
-from .entity import CompalEntity
+from .entity import GatewayEntity
 
 
 def _wifi_up(band: str) -> Callable[[dict], bool | None]:
@@ -29,70 +29,70 @@ def _wifi_up(band: str) -> Callable[[dict], bool | None]:
 
 
 @dataclass(frozen=True, kw_only=True)
-class CompalBinaryDescription(BinarySensorEntityDescription):
-    """Describes a Compal binary sensor and how to read its state."""
+class GatewayBinaryDescription(BinarySensorEntityDescription):
+    """Describes a gateway binary sensor and how to read its state."""
 
     value_fn: Callable[[dict], bool | None]
     attr_fn: Callable[[dict], dict] | None = None
 
 
-BINARY_SENSORS: tuple[CompalBinaryDescription, ...] = (
-    CompalBinaryDescription(
+BINARY_SENSORS: tuple[GatewayBinaryDescription, ...] = (
+    GatewayBinaryDescription(
         key="modem_operational",
         translation_key="modem_operational",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         value_fn=lambda d: getattr(d.get("cable"), "operational", None),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="bridge_mode",
         translation_key="bridge_mode",
         icon="mdi:bridge",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("modem_mode"), "bridge_mode", None),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="wifi_2g",
         translation_key="wifi_2g",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_wifi_up("band2g"),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="wifi_5g",
         translation_key="wifi_5g",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_wifi_up("band5g"),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="baseline_privacy",
         translation_key="baseline_privacy",
         icon="mdi:lock-check",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("cable"), "baseline_privacy_enabled", None),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="registration_complete",
         translation_key="registration_complete",
         icon="mdi:check-decagram",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("registration"), "registration_complete", None),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="downstream_locked",
         translation_key="downstream_locked",
         icon="mdi:lock",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("registration"), "downstream_locked", None),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="upnp",
         translation_key="upnp",
         icon="mdi:upload-network",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: d.get("upnp"),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="dmz",
         translation_key="dmz",
         device_class=BinarySensorDeviceClass.SAFETY,
@@ -100,21 +100,21 @@ BINARY_SENSORS: tuple[CompalBinaryDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("dmz"), "enabled", None),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="firewall",
         translation_key="firewall",
         icon="mdi:shield-check",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: getattr(d.get("firewall"), "enabled", None),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="smart_wifi",
         translation_key="smart_wifi",
         icon="mdi:wifi-cog",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: d.get("smart_wifi"),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="guest_wifi_2g",
         translation_key="guest_wifi_2g",
         icon="mdi:wifi-lock-open",
@@ -122,7 +122,7 @@ BINARY_SENSORS: tuple[CompalBinaryDescription, ...] = (
         value_fn=lambda d: getattr((d.get("guest_wifi") or {}).get("band2g"), "enabled", None),
         attr_fn=lambda d: {"ssid": getattr((d.get("guest_wifi") or {}).get("band2g"), "ssid", None)},
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="guest_wifi_5g",
         translation_key="guest_wifi_5g",
         icon="mdi:wifi-lock-open",
@@ -130,21 +130,21 @@ BINARY_SENSORS: tuple[CompalBinaryDescription, ...] = (
         value_fn=lambda d: getattr((d.get("guest_wifi") or {}).get("band5g"), "enabled", None),
         attr_fn=lambda d: {"ssid": getattr((d.get("guest_wifi") or {}).get("band5g"), "ssid", None)},
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="wps_2g",
         translation_key="wps_2g",
         icon="mdi:wifi-refresh",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("wps") or {}).get("band2g"),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="wps_5g",
         translation_key="wps_5g",
         icon="mdi:wifi-refresh",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get("wps") or {}).get("band5g"),
     ),
-    CompalBinaryDescription(
+    GatewayBinaryDescription(
         key="dslite",
         translation_key="dslite",
         icon="mdi:ip-network",
@@ -159,26 +159,26 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the Compal binary sensors from a config entry."""
-    coordinator: CompalDataUpdateCoordinator = hass.data[DOMAIN][
+    """Set up the gateway binary sensors from a config entry."""
+    coordinator: GatewayDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]["coordinator"]
     async_add_entities(
-        CompalBinarySensor(coordinator, config_entry.entry_id, description)
+        GatewayBinarySensor(coordinator, config_entry.entry_id, description)
         for description in BINARY_SENSORS
     )
 
 
-class CompalBinarySensor(CompalEntity, BinarySensorEntity):
-    """A single Compal gateway binary sensor."""
+class GatewayBinarySensor(GatewayEntity, BinarySensorEntity):
+    """A single gateway binary sensor."""
 
-    entity_description: CompalBinaryDescription
+    entity_description: GatewayBinaryDescription
 
     def __init__(
         self,
-        coordinator: CompalDataUpdateCoordinator,
+        coordinator: GatewayDataUpdateCoordinator,
         entry_id: str,
-        description: CompalBinaryDescription,
+        description: GatewayBinaryDescription,
     ) -> None:
         """Initialize the binary sensor."""
         super().__init__(coordinator, entry_id, description.key)

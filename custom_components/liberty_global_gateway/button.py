@@ -1,4 +1,4 @@
-"""Button platform for the Compal / Sagemcom F3896LG integration."""
+"""Button platform for the Liberty Global cable gateway integration."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from compalf3896lg.exceptions import CompalError
+from liberty_global_gateway.exceptions import GatewayError
 
-from . import CompalDataUpdateCoordinator
+from . import GatewayDataUpdateCoordinator
 from .const import DOMAIN
-from .entity import CompalEntity
+from .entity import GatewayEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,13 +26,13 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the reboot button from a config entry."""
-    coordinator: CompalDataUpdateCoordinator = hass.data[DOMAIN][
+    coordinator: GatewayDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]["coordinator"]
-    async_add_entities([CompalRebootButton(coordinator, config_entry.entry_id)])
+    async_add_entities([GatewayRebootButton(coordinator, config_entry.entry_id)])
 
 
-class CompalRebootButton(CompalEntity, ButtonEntity):
+class GatewayRebootButton(GatewayEntity, ButtonEntity):
     """Reboot the gateway (drops the WAN for a minute or two)."""
 
     _attr_translation_key = "reboot"
@@ -40,7 +40,7 @@ class CompalRebootButton(CompalEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
-        self, coordinator: CompalDataUpdateCoordinator, entry_id: str
+        self, coordinator: GatewayDataUpdateCoordinator, entry_id: str
     ) -> None:
         """Initialize the reboot button."""
         super().__init__(coordinator, entry_id, "reboot")
@@ -51,7 +51,7 @@ class CompalRebootButton(CompalEntity, ButtonEntity):
         try:
             await client.login()
             await client.reboot()
-        except CompalError as err:
+        except GatewayError as err:
             raise HomeAssistantError(f"Could not reboot the gateway: {err}") from err
         finally:
             await client.logout()

@@ -1,4 +1,4 @@
-"""System health for the Compal / Sagemcom F3896LG integration."""
+"""System health for the Liberty Global cable gateway integration."""
 
 from __future__ import annotations
 

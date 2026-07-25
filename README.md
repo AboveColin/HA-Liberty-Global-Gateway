@@ -1,25 +1,44 @@
-# Ziggo Cable Gateway (Sagemcom / Compal F3896LG) — Home Assistant
+# Liberty Global Cable Gateway — Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 
-Home Assistant integration for the **F3896LG** DOCSIS 3.1 cable gateway that
-**Ziggo** (and other Liberty Global operators) ship in the Netherlands. It reads
-the gateway's local admin REST API — no cloud, all polling stays on your LAN.
+Home Assistant integration for the DOCSIS cable gateways that **Liberty Global**
+operators ship — the **Ziggo SmartWifi modem** (NL), the **UPC / Unitymedia
+Connect Box**, **Virgin Media** hubs, and the Sunrise / Yallo equivalents. They
+all run the same LG-RDK firmware and expose the same local admin REST API — no
+cloud, all polling stays on your LAN.
 
-> **Known by many names.** This is the modem/router Ziggo hands out as the
-> *"Ziggo SmartWifi"* box. Depending on the batch it is branded **Sagemcom
-> F@st 3896 / F3896LG** or **Compal F3896LG** — they share the same firmware and
-> API, so this integration works with all of them. If you searched for *Ziggo
-> modem*, *Sagemcom F3896*, *Compal F3896LG*, *Ziggo SmartWifi*, or *Liberty
-> Global F3896LG* — this is the one.
+> **Known by many names.** If you searched for *Ziggo modem*, *Ziggo SmartWifi*,
+> *Sagemcom F@st 3896*, *Compal F3896LG*, *UPC Connect Box*, *Virgin Media Hub*,
+> *Unitymedia Connect Box* or *Liberty Global cable gateway* — this is the one.
 
-_Unofficial and not affiliated with, endorsed by, or connected to Sagemcom,
-Compal, Liberty Global, Ziggo or VodafoneZiggo. Use on your own gateway at your
-own risk._
+## Supported hardware
+
+| Model | ODM | Generation | Typically sold as |
+|---|---|---|---|
+| `F3896LG` | Sagemcom | mv2+ | Ziggo SmartWifi modem (NL) — **verified** |
+| `F3897LG` | Sagemcom | mv2+ | Ziggo / Liberty Global |
+| `F5685LGB` | Sagemcom | mv3 | Liberty Global (DOCSIS 3.1, Wi-Fi 6) |
+| `F5685LGE` | Sagemcom | mv3 | Liberty Global (DOCSIS 3.1, Wi-Fi 6) |
+| `CH7465LG` | Compal | mv1 | UPC / Unitymedia Connect Box |
+
+Operator brands the firmware ships skins for: Ziggo, UPC, Virgin Media,
+Unitymedia, Sunrise, Yallo, Munro, Lumina, Grand Slam. The integration reads the
+gateway's own branding, so the device shows up as e.g. *"Ziggo SmartWifi modem
+(F3896LG)"*.
+
+> Only the **Sagemcom F3896LG** (Ziggo, firmware `LG-RDK_12.13.16`) is verified
+> against real hardware. The other models share the firmware and API, so they are
+> expected to work but are unverified — reports welcome. Endpoints a model lacks
+> are skipped rather than breaking the poll.
+
+_Unofficial and not affiliated with, endorsed by, or connected to Liberty Global,
+Ziggo, VodafoneZiggo, UPC, Virgin Media, Sunrise, Unitymedia, Sagemcom or Compal.
+Use on your own gateway at your own risk._
 
 ## What you get
 
-A single **Ziggo Cable Gateway** device with:
+A single gateway device, named after your operator's own branding, with:
 
 **Sensors**
 - DOCSIS status (with DOCSIS version and service status attributes)
@@ -67,7 +86,7 @@ A single **Ziggo Cable Gateway** device with:
 
 ## How it handles the single-session gateway
 
-The F3896LG allows **exactly one authenticated session**. This integration logs
+The gateway allows **exactly one authenticated session**. This integration logs
 in, reads everything in one burst, and then **logs out** (`DELETE
 /user/<id>/token/<token>`) every polling cycle (every 5 minutes), so the
 gateway's single session is freed immediately and its web UI stays usable
@@ -76,7 +95,7 @@ cadence is safe. If the web UI is open (holding the session) when a poll runs,
 the integration keeps the last-known values instead of flapping every entity to
 *unavailable*.
 
-Built on the [`compalf3896lg`](https://github.com/AboveColin/compalf3896lg)
+Built on the [`liberty-global-gateway`](https://github.com/AboveColin/liberty-global-gateway)
 Python library.
 
 ## Installation
@@ -84,19 +103,33 @@ Python library.
 ### HACS (custom repository)
 
 1. HACS → ⋮ → **Custom repositories**.
-2. Add `https://github.com/AboveColin/HA-Compal-F3896LG` as an **Integration**.
-3. Install **Ziggo Cable Gateway (F3896LG)**, then restart Home Assistant.
+2. Add `https://github.com/AboveColin/HA-Liberty-Global-Gateway` as an **Integration**.
+3. Install **Liberty Global Cable Gateway**, then restart Home Assistant.
 
 ### Manual
 
-Copy `custom_components/compal_f3896lg` into your Home Assistant
+Copy `custom_components/liberty_global_gateway` into your Home Assistant
 `config/custom_components/` directory and restart.
 
 ## Configuration
 
-**Settings → Devices & services → Add integration → Ziggo Cable Gateway.**
+### Automatic discovery
 
-- **Gateway address** — usually `192.168.178.1`.
+If **UPnP is enabled** on the gateway, Home Assistant finds it over SSDP and
+offers it under **Settings → Devices & services** — you only have to enter the
+admin password. The integration confirms the device really is one of these
+gateways (via an unauthenticated identification endpoint) before offering it, so
+other UPnP routers on the network are ignored.
+
+UPnP is off on some operator builds; in that case, add it manually.
+
+### Manual
+
+**Settings → Devices & services → Add integration → Liberty Global Cable
+Gateway.**
+
+- **Gateway address** — pre-filled with a gateway that actually answers on your
+  network (`192.168.178.1` on Ziggo, `192.168.0.1` on UPC / Virgin Media).
 - **Admin password** — the password printed on the sticker on the gateway,
   unless you changed it.
 

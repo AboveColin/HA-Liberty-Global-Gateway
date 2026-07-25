@@ -1,0 +1,31 @@
+{
+  "domain": "liberty_global_gateway",
+  "name": "Liberty Global Cable Gateway",
+  "codeowners": [
+    "@abovecolin"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/abovecolin/HA-Liberty-Global-Gateway",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/abovecolin/HA-Liberty-Global-Gateway/issues",
+  "requirements": [
+    "liberty-global-gateway==2.0.0"
+  ],
+  "ssdp": [
+    {
+      "manufacturer": "Sagemcom",
+      "deviceType": "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
+    },
+    {
+      "manufacturer": "Compal",
+      "deviceType": "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
+    },
+    {
+      "manufacturer": "Compal Broadband Networks, Inc.",
+      "deviceType": "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
+    }
+  ],
+  "version": "2.0.0"
+}
