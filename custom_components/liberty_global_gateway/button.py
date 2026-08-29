@@ -47,11 +47,8 @@ class GatewayRebootButton(GatewayEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Log in, issue a reboot, then release the session slot."""
-        client = self.coordinator.client
         try:
-            await client.login()
-            await client.reboot()
+            async with self.coordinator.session():
+                await self.coordinator.client.reboot()
         except GatewayError as err:
             raise HomeAssistantError(f"Could not reboot the gateway: {err}") from err
-        finally:
-            await client.logout()

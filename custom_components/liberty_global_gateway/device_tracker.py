@@ -60,7 +60,8 @@ class GatewayDeviceTracker(
         super().__init__(coordinator)
         self._entry_id = entry_id
         self._mac = mac
-        self._attr_unique_id = f"{entry_id}_{mac}"
+        # No _attr_unique_id here: ScannerEntity overrides the unique_id property
+        # to return mac_address, so setting the attribute would have no effect.
 
     @property
     def _host(self):

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from dataclasses import fields as dataclass_fields
+from dataclasses import is_dataclass
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -41,7 +43,29 @@ def _model_dump(obj: Any) -> Any:
     raw = getattr(obj, "raw", None)
     if isinstance(raw, dict):
         return async_redact_data(raw, TO_REDACT)
-    return str(obj)
+    if is_dataclass(obj) and not isinstance(obj, type):
+        # Models without a ``.raw`` dict (lan, ipv6, registration, system, cable,
+        # modem_mode, software_update and the rest) still carry field names that
+        # TO_REDACT matches. Falling through to str() here would have written the
+        # full repr, IP addresses and serial included, into the diagnostics file.
+        return async_redact_data(
+            {
+                field.name: _model_dump(getattr(obj, field.name))
+                for field in dataclass_fields(obj)
+                if field.name != "raw"
+            },
+            TO_REDACT,
+        )
+    if isinstance(obj, dict):
+        return async_redact_data(
+            {key: _model_dump(value) for key, value in obj.items()}, TO_REDACT
+        )
+    if isinstance(obj, (list, tuple)):
+        return [_model_dump(item) for item in obj]
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    # Nothing left to key redaction off, so scrub MACs out of the repr.
+    return _MAC_RE.sub("**REDACTED**", str(obj))
 
 
 async def async_get_config_entry_diagnostics(

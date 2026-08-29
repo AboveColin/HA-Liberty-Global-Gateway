@@ -52,12 +52,15 @@ A single gateway device, named after your operator's own branding, with:
 - Provisioned download / upload speed (your plan's rate caps, from the DOCSIS
   service flows)
 - Firmware version and **software-update status**
-- **WAN IP address** (public IPv4, with gateway, DNS, IPv6 and lease as attributes)
-- Gateway LAN IP and IPv6 delegated prefix
+- **WAN IP address** (public IPv4). WAN gateway, WAN IPv6, DHCP lease time and
+  DNS servers ship as their own sensors, not as attributes of this one
+- Gateway LAN IP, LAN DHCP pool range, and IPv6 delegated prefix
 - Wi-Fi 2.4 GHz / 5 GHz SSID (with channel, width and security as attributes)
+- Wi-Fi 2.4 GHz / 5 GHz channel numbers
 - **Last event** — the newest cable-modem event-log line, with its timestamp,
   priority and total event count as attributes
 - Port-forwarding rule count, DHCP reservation count, and active telephony lines
+- MAC filter, port trigger and IP/port filter rule counts
 
 **Binary sensors**
 - Modem operational (connectivity)
@@ -65,8 +68,8 @@ A single gateway device, named after your operator's own branding, with:
 - Baseline privacy (BPI+)
 - **Firewall**, **DMZ** and **UPnP** state (security at a glance)
 - **Smart Wi-Fi** (band steering); Guest Wi-Fi 2.4/5 GHz (SSID as attribute)
-- Bridge mode
-- Wi-Fi 2.4 GHz and Wi-Fi 5 GHz up/down
+- Bridge mode and **DS-Lite** (IPv4-over-IPv6 transition)
+- Wi-Fi 2.4 GHz and Wi-Fi 5 GHz up/down; **WPS** 2.4 GHz and 5 GHz
 
 **Device trackers**
 - One per device seen in the gateway's DHCP/association table, for presence
@@ -91,14 +94,28 @@ in, reads everything in one burst, and then **logs out** (`DELETE
 /user/<id>/token/<token>`) every polling cycle (every 5 minutes), so the
 gateway's single session is freed immediately and its web UI stays usable
 between polls. Successful logins never count toward the lockout, so the regular
-cadence is safe. If the web UI is open (holding the session) when a poll runs,
-the integration keeps the last-known values instead of flapping every entity to
-*unavailable*.
+cadence is safe.
+
+If the web UI is open (holding the session) when a poll runs, the integration
+replays the last-known values instead of flapping every entity to *unavailable*.
+That replay is bounded at two consecutive cycles, so a web UI left open all
+afternoon makes the entities unavailable rather than serving hours-old readings
+as if they were current. Entity commands (reboot, the switches, LED brightness)
+take the same session lock as the poll, so a button press can never revoke the
+token a poll is holding.
+
+A lockout is a cooldown of a few minutes that clears by itself, so it is treated
+as a temporary update failure and retried. It does not ask you to re-enter your
+password, because the stored one is still correct.
 
 Built on the [`liberty-global-gateway`](https://github.com/AboveColin/liberty-global-gateway)
 Python library.
 
 ## Installation
+
+Requires Home Assistant **2025.2.0** or newer: the config flow imports
+`homeassistant.helpers.service_info.ssdp`, which does not exist before that
+release.
 
 ### HACS (custom repository)
 

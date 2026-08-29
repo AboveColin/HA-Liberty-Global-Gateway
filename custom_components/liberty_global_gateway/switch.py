@@ -89,16 +89,15 @@ class GatewaySwitch(GatewayEntity, SwitchEntity):
         return self.entity_description.value_fn(self.coordinator.data or {})
 
     async def _apply(self, turn_on: bool) -> None:
-        client = self.coordinator.client
         try:
-            await client.login()
-            await self.entity_description.set_fn(client, turn_on)
+            async with self.coordinator.session():
+                await self.entity_description.set_fn(
+                    self.coordinator.client, turn_on
+                )
         except GatewayError as err:
             raise HomeAssistantError(
                 f"Could not update {self.entity_description.key}: {err}"
             ) from err
-        finally:
-            await client.logout()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
