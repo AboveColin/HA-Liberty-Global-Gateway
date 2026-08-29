@@ -1,22 +1,22 @@
-# Liberty Global Cable Gateway — Home Assistant
+# Liberty Global Cable Gateway for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 
-Home Assistant integration for the DOCSIS cable gateways that **Liberty Global**
-operators ship — the **Ziggo SmartWifi modem** (NL), the **UPC / Unitymedia
-Connect Box**, **Virgin Media** hubs, and the Sunrise / Yallo equivalents. They
-all run the same LG-RDK firmware and expose the same local admin REST API — no
-cloud, all polling stays on your LAN.
+Home Assistant integration for the DOCSIS cable gateways Liberty Global
+operators ship: the Ziggo SmartWifi modem in the Netherlands, the UPC and
+Unitymedia Connect Box, the Virgin Media hubs, and the Sunrise and Yallo
+equivalents. They run the same LG-RDK firmware and expose the same local admin
+REST API. There is no cloud, and every poll stays on your LAN.
 
-> **Known by many names.** If you searched for *Ziggo modem*, *Ziggo SmartWifi*,
-> *Sagemcom F@st 3896*, *Compal F3896LG*, *UPC Connect Box*, *Virgin Media Hub*,
-> *Unitymedia Connect Box* or *Liberty Global cable gateway* — this is the one.
+> Known by many names. If you searched for Ziggo modem, Ziggo SmartWifi,
+> Sagemcom F@st 3896, Compal F3896LG, UPC Connect Box, Virgin Media Hub,
+> Unitymedia Connect Box or Liberty Global cable gateway, this is the one.
 
 ## Supported hardware
 
 | Model | ODM | Generation | Typically sold as |
 |---|---|---|---|
-| `F3896LG` | Sagemcom | mv2+ | Ziggo SmartWifi modem (NL) — **verified** |
+| `F3896LG` | Sagemcom | mv2+ | Ziggo SmartWifi modem (NL), verified |
 | `F3897LG` | Sagemcom | mv2+ | Ziggo / Liberty Global |
 | `F5685LGB` | Sagemcom | mv3 | Liberty Global (DOCSIS 3.1, Wi-Fi 6) |
 | `F5685LGE` | Sagemcom | mv3 | Liberty Global (DOCSIS 3.1, Wi-Fi 6) |
@@ -27,14 +27,14 @@ Unitymedia, Sunrise, Yallo, Munro, Lumina, Grand Slam. The integration reads the
 gateway's own branding, so the device shows up as e.g. *"Ziggo SmartWifi modem
 (F3896LG)"*.
 
-> Only the **Sagemcom F3896LG** (Ziggo, firmware `LG-RDK_12.13.16`) is verified
-> against real hardware. The other models share the firmware and API, so they are
-> expected to work but are unverified — reports welcome. Endpoints a model lacks
-> are skipped rather than breaking the poll.
+> Only the Sagemcom F3896LG on Ziggo, firmware `LG-RDK_12.13.16`, is verified
+> against real hardware. The other models share the firmware and the API, so
+> they should work, but nobody has confirmed it. Reports welcome. An endpoint a
+> model lacks is skipped rather than breaking the poll.
 
-_Unofficial and not affiliated with, endorsed by, or connected to Liberty Global,
-Ziggo, VodafoneZiggo, UPC, Virgin Media, Sunrise, Unitymedia, Sagemcom or Compal.
-Use on your own gateway at your own risk._
+_Unofficial, and not affiliated with Liberty Global, Ziggo, VodafoneZiggo, UPC,
+Virgin Media, Sunrise, Unitymedia, Sagemcom or Compal. Use on your own gateway,
+at your own risk._
 
 ## What you get
 
@@ -48,16 +48,16 @@ A single gateway device, named after your operator's own branding, with:
 - Upstream power (max)
 - Downstream / upstream channel counts (with locked-channel counts as attributes)
 - Corrected and uncorrected error counters
-- **T3 and T4 timeout counters** (upstream line-health indicators)
+- T3 and T4 timeout counters, which indicate upstream line health
 - Provisioned download / upload speed (your plan's rate caps, from the DOCSIS
   service flows)
-- Firmware version and **software-update status**
-- **WAN IP address** (public IPv4). WAN gateway, WAN IPv6, DHCP lease time and
+- Firmware version and software-update status
+- WAN IP address (public IPv4). WAN gateway, WAN IPv6, DHCP lease time and
   DNS servers ship as their own sensors, not as attributes of this one
 - Gateway LAN IP, LAN DHCP pool range, and IPv6 delegated prefix
 - Wi-Fi 2.4 GHz / 5 GHz SSID (with channel, width and security as attributes)
 - Wi-Fi 2.4 GHz / 5 GHz channel numbers
-- **Last event** — the newest cable-modem event-log line, with its timestamp,
+- Last event, the newest cable-modem event-log line, with its timestamp,
   priority and total event count as attributes
 - Port-forwarding rule count, DHCP reservation count, and active telephony lines
 - MAC filter, port trigger and IP/port filter rule counts
@@ -66,26 +66,27 @@ A single gateway device, named after your operator's own branding, with:
 - Modem operational (connectivity)
 - Registration complete and Downstream locked
 - Baseline privacy (BPI+)
-- **Firewall**, **DMZ** and **UPnP** state (security at a glance)
-- **Smart Wi-Fi** (band steering); Guest Wi-Fi 2.4/5 GHz (SSID as attribute)
-- Bridge mode and **DS-Lite** (IPv4-over-IPv6 transition)
-- Wi-Fi 2.4 GHz and Wi-Fi 5 GHz up/down; **WPS** 2.4 GHz and 5 GHz
+- Firewall, DMZ and UPnP state
+- Smart Wi-Fi (band steering), and Guest Wi-Fi 2.4/5 GHz with the SSID as an attribute
+- Bridge mode and DS-Lite (IPv4 over IPv6)
+- Wi-Fi 2.4 GHz and 5 GHz up/down, and WPS on both bands
 
 **Device trackers**
 - One per device seen in the gateway's DHCP/association table, for presence
   detection (with IP, hostname, device type, interface, Wi-Fi band, RSSI, link
   speed, IPv6 and DHCP lease time as attributes).
-- Like other router integrations (FRITZ!Box, UniFi, …), these trackers are
-  **disabled by default**. Home Assistant automatically enables a tracker for a
-  device it already knows (one whose MAC matches an existing device); enable any
-  others you want to track under **Settings → Devices & services → Entities**.
+- Like FRITZ!Box and UniFi, these trackers are disabled by default. Home
+  Assistant enables the tracker for a device it already knows, meaning one whose
+  MAC matches an existing device. Enable the others you want under
+  **Settings**, **Devices & services**, **Entities**.
 
 **Switches & controls**
-- **UPnP** on/off, **LED automatic brightness** on/off, and **LED brightness**
-  (0-100). Connectivity-safe only — no Wi-Fi radio or bridge-mode toggles.
+- UPnP on/off, LED automatic brightness on/off, and LED brightness from 0 to
+  100. Nothing here can drop your connection, so there are no Wi-Fi radio or
+  bridge-mode toggles.
 
 **Button**
-- Reboot gateway (drops the WAN for a minute or two — a deliberate action).
+- Reboot gateway. This drops the WAN for a minute or two, so it is deliberate.
 
 ## How it handles the single-session gateway
 
@@ -132,38 +133,36 @@ Copy `custom_components/liberty_global_gateway` into your Home Assistant
 
 ### Automatic discovery
 
-If **UPnP is enabled** on the gateway, Home Assistant finds it over SSDP and
-offers it under **Settings → Devices & services** — you only have to enter the
-admin password. The integration confirms the device really is one of these
-gateways (via an unauthenticated identification endpoint) before offering it, so
-other UPnP routers on the network are ignored.
+If UPnP is enabled on the gateway, Home Assistant finds it over SSDP and offers
+it under **Settings**, **Devices & services**. You only enter the admin
+password. Before offering it, the integration checks an unauthenticated
+identification endpoint to confirm the device is one of these gateways, so other
+UPnP routers on the network are ignored.
 
-UPnP is off on some operator builds; in that case, add it manually.
+Some operator builds ship with UPnP off. Add the gateway manually there.
 
 ### Manual
 
 **Settings → Devices & services → Add integration → Liberty Global Cable
 Gateway.**
 
-- **Gateway address** — pre-filled with a gateway that actually answers on your
-  network (`192.168.178.1` on Ziggo, `192.168.0.1` on UPC / Virgin Media).
-- **Admin password** — the password printed on the sticker on the gateway,
-  unless you changed it.
+- Gateway address, pre-filled with an address that answers on your network.
+  That is `192.168.178.1` on Ziggo and `192.168.0.1` on UPC and Virgin Media.
+- Admin password, printed on the sticker on the gateway unless you changed it.
 
-> Close the gateway's web UI before adding it — the gateway only allows one
-> session at a time.
+> Close the gateway's web UI before adding it. The gateway allows one session at
+> a time.
 
 The admin certificate is self-signed, so TLS verification is off by default.
 
 ## Notes
 
-- **Local polling**, every 5 minutes. No data leaves your network.
-- **Errors after too many wrong passwords:** the gateway locks out login
-  attempts for a few minutes after a handful of failures. The setup form reports
-  this instead of hammering it.
-- **Provisioned speed ≠ measured speed:** the download/upload sensors report the
-  DOCSIS service-flow rate caps for your plan, not a live throughput test.
+- Local polling every 5 minutes. No data leaves your network.
+- After a handful of wrong passwords the gateway locks out login attempts for a
+  few minutes. The setup form reports the lockout instead of hammering it.
+- The download and upload sensors report the DOCSIS service-flow rate caps for
+  your plan. That is the provisioned speed, not a throughput test.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
