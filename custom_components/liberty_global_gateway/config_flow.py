@@ -14,6 +14,11 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 from homeassistant.helpers.service_info.ssdp import (
     ATTR_UPNP_SERIAL,
     ATTR_UPNP_UDN,
@@ -31,6 +36,10 @@ from liberty_global_gateway.exceptions import (
 from .const import CONF_HOST, CONF_PASSWORD, DEFAULT_HOST, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# A bare `str` renders the secret in clear text in the config form. TextSelector
+# with type PASSWORD makes the browser treat it as a password field.
+_SECRET = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
 
 # Addresses this gateway family is shipped on, tried in order when guessing a
 # default for the manual form: Ziggo hands out 192.168.178.1, UPC / Virgin
@@ -214,7 +223,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="discovery_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): _SECRET}),
             errors=errors,
             description_placeholders={
                 "name": self._discovered_title or "Cable Gateway",
@@ -261,7 +270,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_HOST, default=suggested_host): str,
-                    vol.Required(CONF_PASSWORD): str,
+                    vol.Required(CONF_PASSWORD): _SECRET,
                 }
             ),
             errors=errors,
@@ -306,7 +315,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): _SECRET}),
             errors=errors,
             description_placeholders={"host": host},
         )
