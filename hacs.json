@@ -1,5 +1,6 @@
 {
-  "name": "Liberty Global Cable Gateway (Ziggo SmartWifi / UPC Connect Box / Virgin Media Hub — Sagemcom F3896LG, F3897LG, F5685LGB, F5685LGE, Compal CH7465LG)",
+  "name": "Liberty Global Cable Gateway",
+  "homeassistant": "2025.2.0",
   "content_in_root": false,
   "render_readme": true
 }

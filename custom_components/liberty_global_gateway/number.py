@@ -57,12 +57,9 @@ class GatewayLedBrightness(GatewayEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the LED brightness."""
-        client = self.coordinator.client
         try:
-            await client.login()
-            await client.set_led(brightness=int(value))
+            async with self.coordinator.session():
+                await self.coordinator.client.set_led(brightness=int(value))
         except GatewayError as err:
             raise HomeAssistantError(f"Could not set LED brightness: {err}") from err
-        finally:
-            await client.logout()
         await self.coordinator.async_request_refresh()

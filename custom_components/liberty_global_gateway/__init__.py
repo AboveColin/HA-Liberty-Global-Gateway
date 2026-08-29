@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
@@ -44,6 +47,11 @@ PLATFORMS = [
 # count toward the lockout, so a 5-minute cadence is safe.
 SCAN_INTERVAL = timedelta(minutes=5)
 
+# How many consecutive polls may serve the previous payload when the gateway's
+# single session is held elsewhere. Two cycles is 10 minutes of replay, past
+# which the entry goes unavailable rather than showing stale values as current.
+MAX_STALE_CYCLES = 2
+
 
 class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
     """Coordinator that logs in, reads a burst and drops the token each cycle."""
@@ -57,85 +65,129 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=SCAN_INTERVAL,
         )
         self.client = client
+        # The gateway allows exactly one authenticated session, and a second
+        # login revokes the first token. Serialise every login-to-logout span,
+        # or a button press during a poll breaks both halves.
+        self._session_lock = asyncio.Lock()
+        self._stale_cycles = 0
+        self._stale_host_cycles = 0
         # Operator branding (skin + product name). Static for the life of a
         # firmware, so it is read once and reused for the device registry name.
         self.localization = None
 
+    @asynccontextmanager
+    async def session(self) -> AsyncIterator[None]:
+        """Hold the gateway's single session slot for one login-to-logout span.
+
+        Logging out releases the slot at once (DELETE /user/<id>/token/<token>)
+        instead of waiting for the ~15 minute idle timeout, so the router's web
+        UI stays usable between polls. Best effort inside the library.
+        """
+        async with self._session_lock:
+            await self.client.login()
+            try:
+                yield
+            finally:
+                await self.client.logout()
+
     async def _async_update_data(self) -> dict:
         """Log in, read the gateway in one burst, then release the session slot."""
         try:
-            await self.client.login()
+            async with self.session():
 
-            if self.localization is None:
-                self.localization = await self._safe(self.client.get_localization())
+                if self.localization is None:
+                    self.localization = await self._safe(self.client.get_localization())
 
-            system = await self.client.get_system_info()
-            modem_mode = await self.client.get_modem_mode()
-            cable = await self.client.get_cable_modem_state()
-            downstream = await self.client.get_downstream_channels()
-            upstream = await self.client.get_upstream_channels()
-            service_flows = await self.client.get_service_flows()
-            wifi_states = await self.client.get_wifi_states()
-            try:
-                hosts = await self.client.get_hosts(connected_only=False)
-            except GatewayNetworkError as err:
-                # The hosts table is the slowest endpoint; if it blips, keep the
-                # previous list rather than dropping every device_tracker.
-                prev_hosts = (self.data or {}).get("hosts")
-                if prev_hosts is None:
-                    raise
-                _LOGGER.debug("hosts read failed (%s); keeping previous list", err)
-                hosts = prev_hosts
-            # Supplementary reads — best effort, so firmware that lacks any of
-            # them never breaks the whole poll.
-            lan = await self._safe(self.client.get_lan_info())
-            ipv6 = await self._safe(self.client.get_ipv6_info())
-            wifi_configs = await self._safe(
-                self.client.get_wifi_configs(), default={}
-            )
-            registration = await self._safe(self.client.get_registration())
-            event_log = await self._safe(self.client.get_event_log(), default=[])
-            provisioning = await self._safe(self.client.get_provisioning())
-            software_update = await self._safe(self.client.get_software_update())
-            upnp = await self._safe(self.client.get_upnp())
-            dmz = await self._safe(self.client.get_dmz())
-            firewall = await self._safe(self.client.get_firewall("ipv4"))
-            smart_wifi = await self._safe(self.client.get_smart_wifi())
-            guest_wifi = await self._safe(
-                self.client.get_guest_wifi_configs(), default={})
-            port_forwarding = await self._safe(
-                self.client.get_port_forwarding(), default=[])
-            reserved_ips = await self._safe(
-                self.client.get_reserved_ips(), default=[])
-            mta_lines = await self._safe(self.client.get_mta_lines(), default=[])
-            led = await self._safe(self.client.get_led())
-            dhcp = await self._safe(self.client.get_dhcp("ipv4"))
-            wps = {
-                "band2g": await self._safe(self.client.get_wps_enabled("band2g")),
-                "band5g": await self._safe(self.client.get_wps_enabled("band5g")),
-            }
-            mac_filters = await self._safe(self.client.get_mac_filters(), default=[])
-            port_triggers = await self._safe(
-                self.client.get_port_triggers(), default=[])
-            ip_port_filters = await self._safe(
-                self.client.get_ip_port_filters(), default=[])
-        except (GatewayLockoutError, GatewayAuthError) as err:
+                system = await self.client.get_system_info()
+                modem_mode = await self.client.get_modem_mode()
+                cable = await self.client.get_cable_modem_state()
+                downstream = await self.client.get_downstream_channels()
+                upstream = await self.client.get_upstream_channels()
+                service_flows = await self.client.get_service_flows()
+                wifi_states = await self.client.get_wifi_states()
+                try:
+                    hosts = await self.client.get_hosts(connected_only=False)
+                except GatewayNetworkError as err:
+                    # The hosts table is the slowest endpoint; if it blips, keep the
+                    # previous list rather than dropping every device_tracker. Bounded
+                    # like the session-busy replay above, because a host list that
+                    # lags the rest of the payload makes presence quietly wrong.
+                    prev_hosts = (self.data or {}).get("hosts")
+                    if prev_hosts is None or self._stale_host_cycles >= MAX_STALE_CYCLES:
+                        raise
+                    self._stale_host_cycles += 1
+                    _LOGGER.debug(
+                        "hosts read failed (%s); replaying previous list (%s/%s)",
+                        err,
+                        self._stale_host_cycles,
+                        MAX_STALE_CYCLES,
+                    )
+                    hosts = prev_hosts
+                else:
+                    self._stale_host_cycles = 0
+                # Supplementary reads — best effort, so firmware that lacks any of
+                # them never breaks the whole poll.
+                lan = await self._safe(self.client.get_lan_info())
+                ipv6 = await self._safe(self.client.get_ipv6_info())
+                wifi_configs = await self._safe(
+                    self.client.get_wifi_configs(), default={}
+                )
+                registration = await self._safe(self.client.get_registration())
+                event_log = await self._safe(self.client.get_event_log(), default=[])
+                provisioning = await self._safe(self.client.get_provisioning())
+                software_update = await self._safe(self.client.get_software_update())
+                upnp = await self._safe(self.client.get_upnp())
+                dmz = await self._safe(self.client.get_dmz())
+                firewall = await self._safe(self.client.get_firewall("ipv4"))
+                smart_wifi = await self._safe(self.client.get_smart_wifi())
+                guest_wifi = await self._safe(
+                    self.client.get_guest_wifi_configs(), default={})
+                port_forwarding = await self._safe(
+                    self.client.get_port_forwarding(), default=[])
+                reserved_ips = await self._safe(
+                    self.client.get_reserved_ips(), default=[])
+                mta_lines = await self._safe(self.client.get_mta_lines(), default=[])
+                led = await self._safe(self.client.get_led())
+                dhcp = await self._safe(self.client.get_dhcp("ipv4"))
+                wps = {
+                    "band2g": await self._safe(self.client.get_wps_enabled("band2g")),
+                    "band5g": await self._safe(self.client.get_wps_enabled("band5g")),
+                }
+                mac_filters = await self._safe(self.client.get_mac_filters(), default=[])
+                port_triggers = await self._safe(
+                    self.client.get_port_triggers(), default=[])
+                ip_port_filters = await self._safe(
+                    self.client.get_ip_port_filters(), default=[])
+        except GatewayAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
+        except GatewayLockoutError as err:
+            # A lockout is a few-minute cooldown that clears by itself, and the
+            # stored password is still correct. Raising ConfigEntryAuthFailed here
+            # would tell the user their credentials are wrong when they are not.
+            raise UpdateFailed(
+                f"Gateway is locked out, retrying after the cooldown: {err}"
+            ) from err
         except GatewaySessionBusyError as err:
-            # The web UI (or a prior client) holds the single session. Keep the
-            # last-known values rather than flapping every entity to unavailable.
-            if self.data is not None:
-                _LOGGER.debug("Gateway session busy; keeping previous data: %s", err)
+            # The web UI (or a prior client) holds the single session. Replay the
+            # last-known values for a couple of cycles rather than flapping every
+            # entity to unavailable, then give up: an unbounded replay serves
+            # arbitrarily old data while the entry still reports as healthy.
+            if self.data is not None and self._stale_cycles < MAX_STALE_CYCLES:
+                self._stale_cycles += 1
+                _LOGGER.debug(
+                    "Gateway session busy; replaying previous data (%s/%s): %s",
+                    self._stale_cycles,
+                    MAX_STALE_CYCLES,
+                    err,
+                )
                 return self.data
-            raise UpdateFailed("Gateway session is busy (close the router web UI)") from err
+            raise UpdateFailed(
+                "Gateway session is busy (close the router web UI)"
+            ) from err
         except GatewayError as err:
             raise UpdateFailed(f"Error communicating with the gateway: {err}") from err
-        finally:
-            # Log out so the router frees its single session slot immediately
-            # (DELETE /user/<id>/token/<token>) — the web UI stays usable and we
-            # never wait for the idle timeout. Best effort inside the library.
-            await self.client.logout()
 
+        self._stale_cycles = 0
         return {
             "system": system,
             "modem_mode": modem_mode,
