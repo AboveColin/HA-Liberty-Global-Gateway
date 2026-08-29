@@ -6,7 +6,8 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -14,6 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,9 +73,29 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
         self._session_lock = asyncio.Lock()
         self._stale_cycles = 0
         self._stale_host_cycles = 0
+        self._boot_time: datetime | None = None
         # Operator branding (skin + product name). Static for the life of a
         # firmware, so it is read once and reused for the device registry name.
         self.localization = None
+
+    def _stable_boot_time(self, cable: Any) -> datetime | None:
+        """Derive a boot timestamp from uptime, held steady between reboots.
+
+        utcnow() minus uptime lands a second or so away on every poll, which
+        would rewrite the timestamp sensor every five minutes and churn recorder
+        history. Keep the first value and only move it when the two disagree by
+        more than a minute, which is what an actual reboot looks like.
+        """
+        uptime = getattr(cable, "uptime", None)
+        if uptime is None:
+            return self._boot_time
+        boot = dt_util.utcnow().replace(microsecond=0) - timedelta(seconds=int(uptime))
+        if (
+            self._boot_time is None
+            or abs((boot - self._boot_time).total_seconds()) > 60
+        ):
+            self._boot_time = boot
+        return self._boot_time
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator[None]:
@@ -192,6 +214,7 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
             "system": system,
             "modem_mode": modem_mode,
             "cable": cable,
+            "boot_time": self._stable_boot_time(cable),
             "downstream": downstream,
             "upstream": upstream,
             "service_flows": service_flows,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -18,7 +18,6 @@ from homeassistant.const import SIGNAL_STRENGTH_DECIBELS, UnitOfDataRate
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.util import dt as dt_util
 
 from . import GatewayDataUpdateCoordinator
 from .const import DOMAIN
@@ -26,12 +25,12 @@ from .entity import GatewayEntity
 
 
 def _boot_time(data: dict) -> datetime | None:
-    """Turn the modem's uptime (seconds) into a stable boot timestamp."""
-    cable = data.get("cable")
-    uptime = getattr(cable, "uptime", None)
-    if uptime is None:
-        return None
-    return dt_util.utcnow().replace(microsecond=0) - timedelta(seconds=int(uptime))
+    """Return the boot timestamp the coordinator derived.
+
+    The coordinator holds it steady between reboots, so this sensor does not
+    move by a second on every poll.
+    """
+    return data.get("boot_time")
 
 
 @dataclass(frozen=True, kw_only=True)
