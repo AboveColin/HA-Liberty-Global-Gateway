@@ -163,6 +163,13 @@ The admin certificate is self-signed, so TLS verification is off by default.
 - The download and upload sensors report the DOCSIS service-flow rate caps for
   your plan. That is the provisioned speed, not a throughput test.
 
+## Supporting the project
+
+This project is free and stays free. If it is useful to you, you can support its
+development through [GitHub Sponsors](https://github.com/sponsors/AboveColin).
+Sponsorship is voluntary and unlocks nothing: every feature, fix and security
+update ships in the public release.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
