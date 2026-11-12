@@ -180,15 +180,17 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
                     self.client.get_port_triggers(), default=[])
                 ip_port_filters = await self._safe(
                     self.client.get_ip_port_filters(), default=[])
-        except GatewayAuthError as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
         except GatewayLockoutError as err:
             # A lockout is a few-minute cooldown that clears by itself, and the
             # stored password is still correct. Raising ConfigEntryAuthFailed here
             # would tell the user their credentials are wrong when they are not.
+            # This clause must come before GatewayAuthError: the lockout error
+            # is a subclass of it, so the auth clause would catch it first.
             raise UpdateFailed(
                 f"Gateway is locked out, retrying after the cooldown: {err}"
             ) from err
+        except GatewayAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
         except GatewaySessionBusyError as err:
             # The web UI (or a prior client) holds the single session. Replay the
             # last-known values for a couple of cycles rather than flapping every
