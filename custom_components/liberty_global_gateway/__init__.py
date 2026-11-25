@@ -11,9 +11,12 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -25,14 +28,19 @@ try:
         GatewayAuthError,
         GatewayError,
         GatewayLockoutError,
-        GatewayNetworkError,
         GatewaySessionBusyError,
     )
 except ImportError as err:  # pragma: no cover - handled by manifest requirements
     _LOGGER.error("Failed to import the liberty_global_gateway package: %s", err)
     raise
 
-from .const import CONF_HOST, CONF_PASSWORD, DOMAIN
+from .const import (
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_TRACK_CLIENTS,
+    DEFAULT_TRACK_CLIENTS,
+    DOMAIN,
+)
 
 PLATFORMS = [
     Platform.SENSOR,
@@ -58,7 +66,12 @@ MAX_STALE_CYCLES = 2
 class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
     """Coordinator that logs in, reads a burst and drops the token each cycle."""
 
-    def __init__(self, hass: HomeAssistant, client: LibertyGatewayClient) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: LibertyGatewayClient,
+        track_clients: bool = DEFAULT_TRACK_CLIENTS,
+    ) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass,
@@ -67,6 +80,8 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=SCAN_INTERVAL,
         )
         self.client = client
+        # With client tracking off, /network/hosts is never requested.
+        self.track_clients = track_clients
         # The gateway allows exactly one authenticated session, and a second
         # login revokes the first token. Serialise every login-to-logout span,
         # or a button press during a poll breaks both halves.
@@ -127,26 +142,6 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
                 upstream = await self.client.get_upstream_channels()
                 service_flows = await self.client.get_service_flows()
                 wifi_states = await self.client.get_wifi_states()
-                try:
-                    hosts = await self.client.get_hosts(connected_only=False)
-                except GatewayNetworkError as err:
-                    # The hosts table is the slowest endpoint; if it blips, keep the
-                    # previous list rather than dropping every device_tracker. Bounded
-                    # like the session-busy replay above, because a host list that
-                    # lags the rest of the payload makes presence quietly wrong.
-                    prev_hosts = (self.data or {}).get("hosts")
-                    if prev_hosts is None or self._stale_host_cycles >= MAX_STALE_CYCLES:
-                        raise
-                    self._stale_host_cycles += 1
-                    _LOGGER.debug(
-                        "hosts read failed (%s); replaying previous list (%s/%s)",
-                        err,
-                        self._stale_host_cycles,
-                        MAX_STALE_CYCLES,
-                    )
-                    hosts = prev_hosts
-                else:
-                    self._stale_host_cycles = 0
                 # Supplementary reads — best effort, so firmware that lacks any of
                 # them never breaks the whole poll.
                 lan = await self._safe(self.client.get_lan_info())
@@ -180,6 +175,9 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
                     self.client.get_port_triggers(), default=[])
                 ip_port_filters = await self._safe(
                     self.client.get_ip_port_filters(), default=[])
+                # Last in the burst: it is the slowest read and may run into its
+                # 60 s timeout, and by then everything else is already in hand.
+                hosts, hosts_available = await self._read_hosts()
         except GatewayLockoutError as err:
             # A lockout is a few-minute cooldown that clears by itself, and the
             # stored password is still correct. Raising ConfigEntryAuthFailed here
@@ -223,6 +221,7 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
             "wifi_states": wifi_states,
             "wifi_configs": wifi_configs or {},
             "hosts": hosts,
+            "hosts_available": hosts_available,
             "lan": lan,
             "ipv6": ipv6,
             "registration": registration,
@@ -246,6 +245,53 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
             "signal": _signal_stats(downstream, upstream),
             "plan": _plan_rates(service_flows),
         }
+
+    async def _read_hosts(self) -> tuple[list, bool]:
+        """Read the client table, never failing the poll because of it.
+
+        Returns the host list and whether it is current enough to show. The
+        DOCSIS data does not depend on /network/hosts, and on a busy LAN that
+        endpoint can take longer than its 60 s timeout. A failure here keeps the
+        previous list (or an empty one on the first poll) and the rest of the
+        payload is still published.
+
+        The replay of a previous list is bounded like the session-busy replay:
+        after MAX_STALE_CYCLES failed reads in a row the list is marked as not
+        available, so the trackers go unavailable and the connected-devices
+        count goes unknown instead of showing presence from 15 minutes ago.
+        """
+        if not self.track_clients:
+            return [], False
+        prev_hosts = (self.data or {}).get("hosts")
+        try:
+            hosts = await self.client.get_hosts(connected_only=False)
+        except (GatewayAuthError, GatewaySessionBusyError):
+            # The session itself is gone, not just this endpoint. The outer
+            # handlers deal with that for the whole payload.
+            raise
+        except GatewayError as err:
+            self._stale_host_cycles += 1
+            available = (
+                prev_hosts is not None
+                and self._stale_host_cycles <= MAX_STALE_CYCLES
+            )
+            # Warn once per run of failures; a gateway that is slow every poll
+            # would otherwise write a warning every five minutes.
+            log = _LOGGER.warning if self._stale_host_cycles == 1 else _LOGGER.debug
+            log(
+                "Reading the client list failed (%s in a row), %s: %s",
+                self._stale_host_cycles,
+                "keeping the previous list" if available
+                else "client trackers are unavailable until it succeeds",
+                err,
+            )
+            return list(prev_hosts or []), available
+        if self._stale_host_cycles:
+            _LOGGER.info(
+                "Client list read again after %s failed polls", self._stale_host_cycles
+            )
+        self._stale_host_cycles = 0
+        return hosts, True
 
     async def _safe(self, coro, default=None):
         """Await an optional read, returning ``default`` if the endpoint fails."""
@@ -318,8 +364,105 @@ def _plan_rates(service_flows: list) -> dict:
     return {"download_mbps": down, "upload_mbps": up}
 
 
+def _track_clients(entry: ConfigEntry) -> bool:
+    """Return whether this entry tracks the gateway's clients."""
+    return entry.options.get(CONF_TRACK_CLIENTS, DEFAULT_TRACK_CLIENTS)
+
+
+def _platforms(entry: ConfigEntry) -> list[Platform]:
+    """Return the platforms to load; device_tracker only with client tracking."""
+    if _track_clients(entry):
+        return PLATFORMS
+    return [p for p in PLATFORMS if p is not Platform.DEVICE_TRACKER]
+
+
+@callback
+def _async_migrate_tracker_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Rewrite tracker unique IDs to the lower-case MAC form of format_mac().
+
+    Before 2.1.0 the unique ID was the MAC exactly as the gateway sent it, and
+    the gateway does not always send the same letter case. One client could so
+    end up with two tracker entities. Every tracker entry is mapped to
+    format_mac(unique_id). Where one MAC has more than one entry, one entry
+    keeps the entity: an enabled entry before a disabled one, then the entry
+    that already has the new ID. The others are removed, because the new
+    unique ID can belong to one entry only.
+    """
+    ent_reg = er.async_get(hass)
+    groups: dict[str, list[er.RegistryEntry]] = {}
+    for reg_entry in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        if reg_entry.domain != Platform.DEVICE_TRACKER:
+            continue
+        groups.setdefault(format_mac(reg_entry.unique_id), []).append(reg_entry)
+
+    for new_id, reg_entries in groups.items():
+        if len(reg_entries) == 1 and reg_entries[0].unique_id == new_id:
+            continue
+        keep = min(
+            reg_entries,
+            key=lambda e: (e.disabled_by is not None, e.unique_id != new_id),
+        )
+        for duplicate in reg_entries:
+            if duplicate is not keep:
+                _LOGGER.info(
+                    "Removing %s: it tracks the same MAC as %s",
+                    duplicate.entity_id,
+                    keep.entity_id,
+                )
+                ent_reg.async_remove(duplicate.entity_id)
+        if keep.unique_id != new_id:
+            _LOGGER.debug(
+                "Migrating the unique ID of %s from %s to %s",
+                keep.entity_id,
+                keep.unique_id,
+                new_id,
+            )
+            ent_reg.async_update_entity(keep.entity_id, new_unique_id=new_id)
+
+
+@callback
+def _async_remove_client_tracking(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove the tracker entities and client devices of this entry.
+
+    Runs when client tracking is off. Without this, the tracker entities stay
+    in the entity registry as "no longer provided" and the client devices stay
+    on the device page of this integration. The gateway device stays.
+    """
+    ent_reg = er.async_get(hass)
+    for reg_entry in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        if reg_entry.domain == Platform.DEVICE_TRACKER:
+            ent_reg.async_remove(reg_entry.entity_id)
+
+    dev_reg = dr.async_get(hass)
+    gateway = (DOMAIN, entry.entry_id)
+    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+        if gateway in device.identifiers:
+            continue
+        if getattr(device, "config_entry_id", None) is not None:
+            # Newer Home Assistant releases give every device one config entry
+            # (2026.10 does, 2026.2 does not). A tracker then registers its own
+            # device even when another integration knows the MAC, and that
+            # device is this entry's alone.
+            dev_reg.async_remove_device(device.id)
+        else:
+            # Older releases add this entry to the device of the integration
+            # that knows the MAC. Take only this entry off; Home Assistant
+            # deletes the device when no config entry uses it any more.
+            # Remove this branch when hacs.json requires a release with one
+            # config entry per device.
+            dev_reg.async_update_device(
+                device.id, remove_config_entry_id=entry.entry_id
+            )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a Liberty Global cable gateway from a config entry."""
+    track_clients = _track_clients(entry)
+    if track_clients:
+        _async_migrate_tracker_unique_ids(hass, entry)
+    else:
+        _async_remove_client_tracking(hass, entry)
+
     session = async_get_clientsession(hass)
     client = LibertyGatewayClient(
         entry.data[CONF_HOST],
@@ -327,7 +470,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         session=session,
     )
 
-    coordinator = GatewayDataUpdateCoordinator(hass, client)
+    coordinator = GatewayDataUpdateCoordinator(hass, client, track_clients)
     try:
         await coordinator.async_config_entry_first_refresh()
     except ConfigEntryAuthFailed:
@@ -335,19 +478,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except UpdateFailed as err:
         raise ConfigEntryNotReady(str(err)) from err
 
+    platforms = _platforms(entry)
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
         "client": client,
         "coordinator": coordinator,
+        # Unload must undo exactly what was set up. The options may already
+        # have changed by then, so the list is not derived from them again.
+        "platforms": platforms,
     }
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(entry, platforms)
+    entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
     return True
+
+
+async def _async_entry_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the entry when the client-tracking option changed.
+
+    The listener also fires for other entry updates, such as the new password
+    of a re-authentication, which reloads the entry by itself.
+    """
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    if coordinator.track_clients != _track_clients(entry):
+        await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+    platforms = hass.data[DOMAIN][entry.entry_id]["platforms"]
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, platforms):
         domain_data = hass.data[DOMAIN].pop(entry.entry_id, None)
         if domain_data:
             await domain_data["client"].close()

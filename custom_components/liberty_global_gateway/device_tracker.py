@@ -3,6 +3,11 @@
 Every host in the gateway's DHCP/association table becomes a router-source
 ``device_tracker`` entity, so presence detection follows devices joining and
 leaving the network.
+
+Entities exist per MAC in the format_mac() form (lower case, colon separated).
+The gateway does not always send a MAC in the same letter case, so every
+comparison goes through that form. The platform is not loaded when the
+"Track clients" option is off.
 """
 
 from __future__ import annotations
@@ -10,6 +15,7 @@ from __future__ import annotations
 from homeassistant.components.device_tracker import ScannerEntity, SourceType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -32,8 +38,10 @@ async def async_setup_entry(
     def _add_new_hosts() -> None:
         new_entities = []
         for host in (coordinator.data or {}).get("hosts") or []:
-            mac = host.mac_address
-            if not mac or mac in tracked:
+            if not host.mac_address:
+                continue
+            mac = format_mac(host.mac_address)
+            if mac in tracked:
                 continue
             tracked.add(mac)
             new_entities.append(
@@ -56,7 +64,7 @@ class GatewayDeviceTracker(
     def __init__(
         self, coordinator: GatewayDataUpdateCoordinator, entry_id: str, mac: str
     ) -> None:
-        """Initialize the tracker for one MAC address."""
+        """Initialize the tracker for one MAC address, in format_mac() form."""
         super().__init__(coordinator)
         self._entry_id = entry_id
         self._mac = mac
@@ -65,11 +73,26 @@ class GatewayDeviceTracker(
 
     @property
     def _host(self):
-        """Return the current host record for this MAC, if present."""
+        """Return the current host record for this MAC, if present.
+
+        The table can hold the same MAC twice in a different letter case, for
+        example an old record next to the current one. A connected record wins.
+        """
+        match = None
         for host in (self.coordinator.data or {}).get("hosts") or []:
-            if host.mac_address == self._mac:
+            if not host.mac_address or format_mac(host.mac_address) != self._mac:
+                continue
+            if host.connected:
                 return host
-        return None
+            match = match or host
+        return match
+
+    @property
+    def available(self) -> bool:
+        """Return False while the client list is too old to trust."""
+        return super().available and bool(
+            (self.coordinator.data or {}).get("hosts_available")
+        )
 
     @property
     def name(self) -> str | None:
