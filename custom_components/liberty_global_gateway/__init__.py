@@ -383,10 +383,22 @@ def _async_migrate_tracker_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -
     Before 2.1.0 the unique ID was the MAC exactly as the gateway sent it, and
     the gateway does not always send the same letter case. One client could so
     end up with two tracker entities. Every tracker entry is mapped to
-    format_mac(unique_id). Where one MAC has more than one entry, one entry
-    keeps the entity: an enabled entry before a disabled one, then the entry
-    that already has the new ID. The others are removed, because the new
-    unique ID can belong to one entry only.
+    format_mac(unique_id), and the new unique ID can belong to one entry only.
+
+    Rule for one MAC with more than one entry: keep the entry that has a state
+    (an enabled entry before a disabled one, and among those the oldest), copy
+    to it each user setting it does not have from the entries that are removed,
+    then give it the new unique ID.
+
+    - A disabled entry has no state, so nothing can rely on it; an enabled
+      entry can be in automations and dashboards.
+    - Among enabled entries the oldest is the original the user set up. A copy
+      that the gateway's case change created later is not.
+    - The kept entry's entity_id, device link, enabled and hidden state stay
+      as they are. Its name, icon and area are filled in from a removed entry
+      only where the kept entry has none, and labels are merged. An area that
+      a removed entry had, on the entity or through its device, goes to the
+      kept entry only if that entry has no area in any way.
     """
     ent_reg = er.async_get(hass)
     groups: dict[str, list[er.RegistryEntry]] = {}
@@ -398,18 +410,21 @@ def _async_migrate_tracker_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -
     for new_id, reg_entries in groups.items():
         if len(reg_entries) == 1 and reg_entries[0].unique_id == new_id:
             continue
-        keep = min(
+        # Registry order breaks a tie in created_at. Entries from before Home
+        # Assistant recorded created_at all carry the same epoch value.
+        order = {e.entity_id: i for i, e in enumerate(reg_entries)}
+        keep, *duplicates = sorted(
             reg_entries,
-            key=lambda e: (e.disabled_by is not None, e.unique_id != new_id),
+            key=lambda e: (e.disabled_by is not None, e.created_at, order[e.entity_id]),
         )
-        for duplicate in reg_entries:
-            if duplicate is not keep:
-                _LOGGER.info(
-                    "Removing %s: it tracks the same MAC as %s",
-                    duplicate.entity_id,
-                    keep.entity_id,
-                )
-                ent_reg.async_remove(duplicate.entity_id)
+        changes = _settings_to_keep(hass, keep, duplicates)
+        for duplicate in duplicates:
+            _LOGGER.info(
+                "Removing %s: it tracks the same MAC as %s",
+                duplicate.entity_id,
+                keep.entity_id,
+            )
+            ent_reg.async_remove(duplicate.entity_id)
         if keep.unique_id != new_id:
             _LOGGER.debug(
                 "Migrating the unique ID of %s from %s to %s",
@@ -418,6 +433,77 @@ def _async_migrate_tracker_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -
                 new_id,
             )
             ent_reg.async_update_entity(keep.entity_id, new_unique_id=new_id)
+        _async_apply_settings(hass, keep.entity_id, changes)
+
+
+@callback
+def _async_apply_settings(
+    hass: HomeAssistant, entity_id: str, changes: dict[str, Any]
+) -> None:
+    """Write the settings taken over from removed duplicates.
+
+    Since Home Assistant 2026.10 an entity that is linked to a device and has
+    no name of its own cannot have an area of its own; the registry raises
+    ValueError. The area then goes on the device, which has no area (the keep
+    rule only moves an area when the kept entry has none). A setting that the
+    registry still refuses is logged and skipped, so the migration never
+    stops the entry from loading.
+    """
+    ent_reg = er.async_get(hass)
+    area_id = changes.pop("area_id", None)
+    if changes:
+        try:
+            ent_reg.async_update_entity(entity_id, **changes)
+        except ValueError as err:
+            _LOGGER.warning("Could not copy %s to %s: %s", changes, entity_id, err)
+    if area_id is None:
+        return
+    try:
+        ent_reg.async_update_entity(entity_id, area_id=area_id)
+    except ValueError:
+        reg_entry = ent_reg.async_get(entity_id)
+        dev_reg = dr.async_get(hass)
+        device = dev_reg.async_get(reg_entry.device_id) if reg_entry else None
+        if device is not None and device.area_id is None:
+            dev_reg.async_update_device(device.id, area_id=area_id)
+
+
+def _settings_to_keep(
+    hass: HomeAssistant,
+    keep: er.RegistryEntry,
+    duplicates: list[er.RegistryEntry],
+) -> dict[str, Any]:
+    """Return the user settings of the duplicates that the kept entry lacks.
+
+    The duplicates come in the order of the keep rule, so where two of them
+    have a name, the one that ranks higher gives it.
+    """
+    dev_reg = dr.async_get(hass)
+
+    def device_area(reg_entry: er.RegistryEntry) -> str | None:
+        device = dev_reg.async_get(reg_entry.device_id) if reg_entry.device_id else None
+        return device.area_id if device else None
+
+    changes: dict[str, Any] = {}
+    name, icon = keep.name, keep.icon
+    has_area = keep.area_id is not None or device_area(keep) is not None
+    area_id = None
+    labels = set(keep.labels)
+    for duplicate in duplicates:
+        name = name or duplicate.name
+        icon = icon or duplicate.icon
+        if not has_area and area_id is None:
+            area_id = duplicate.area_id or device_area(duplicate)
+        labels |= duplicate.labels
+    if name != keep.name:
+        changes["name"] = name
+    if icon != keep.icon:
+        changes["icon"] = icon
+    if area_id is not None:
+        changes["area_id"] = area_id
+    if labels != keep.labels:
+        changes["labels"] = labels
+    return changes
 
 
 @callback
