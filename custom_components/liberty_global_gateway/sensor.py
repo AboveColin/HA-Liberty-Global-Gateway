@@ -16,6 +16,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import SIGNAL_STRENGTH_DECIBELS, UnitOfDataRate
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -31,6 +32,24 @@ def _boot_time(data: dict) -> datetime | None:
     move by a second on every poll.
     """
     return data.get("boot_time")
+
+
+def _connected_devices(data: dict) -> int | None:
+    """Count the connected clients, or None when the client list is unknown.
+
+    The list is unknown when client tracking is off or when /network/hosts has
+    failed for too many polls in a row. A MAC that the gateway lists twice in a
+    different letter case counts once.
+    """
+    if not data.get("hosts_available"):
+        return None
+    return len(
+        {
+            format_mac(h.mac_address) if h.mac_address else id(h)
+            for h in data.get("hosts") or []
+            if h.connected
+        }
+    )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -114,7 +133,7 @@ SENSORS: tuple[GatewaySensorDescription, ...] = (
         icon="mdi:lan-connect",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="devices",
-        value_fn=lambda d: sum(1 for h in (d.get("hosts") or []) if h.connected),
+        value_fn=_connected_devices,
     ),
     GatewaySensorDescription(
         key="downstream_power_min",

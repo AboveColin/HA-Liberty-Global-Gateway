@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -33,7 +34,14 @@ from liberty_global_gateway.exceptions import (
     GatewaySessionBusyError,
 )
 
-from .const import CONF_HOST, CONF_PASSWORD, DEFAULT_HOST, DOMAIN
+from .const import (
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_TRACK_CLIENTS,
+    DEFAULT_HOST,
+    DEFAULT_TRACK_CLIENTS,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -149,6 +157,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle setup of a Liberty Global cable gateway."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> GatewayOptionsFlow:
+        """Return the options flow for an entry."""
+        return GatewayOptionsFlow()
 
     def __init__(self) -> None:
         self._entry: config_entries.ConfigEntry | None = None
@@ -318,4 +334,25 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({vol.Required(CONF_PASSWORD): _SECRET}),
             errors=errors,
             description_placeholders={"host": host},
+        )
+
+
+class GatewayOptionsFlow(config_entries.OptionsFlow):
+    """Change what the integration reads from the gateway."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Show the client-tracking switch."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        track_clients = self.config_entry.options.get(
+            CONF_TRACK_CLIENTS, DEFAULT_TRACK_CLIENTS
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_TRACK_CLIENTS, default=track_clients): bool}
+            ),
         )

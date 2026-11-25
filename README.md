@@ -79,6 +79,8 @@ A single gateway device, named after your operator's own branding, with:
   Assistant enables the tracker for a device it already knows, meaning one whose
   MAC matches an existing device. Enable the others you want under
   **Settings**, **Devices & services**, **Entities**.
+- Turn the **Track clients** option off to skip the client list entirely. See
+  [Options](#options).
 
 **Switches & controls**
 - UPnP on/off, LED automatic brightness on/off, and LED brightness from 0 to
@@ -154,6 +156,30 @@ Gateway.**
 > a time.
 
 The admin certificate is self-signed, so TLS verification is off by default.
+
+### Options
+
+Open **Settings**, **Devices & services**, **Liberty Global Cable Gateway**,
+**Configure**.
+
+- **Track clients** (on by default). When on, every poll reads the gateway's
+  client list (`/network/hosts`) and adds a device tracker for every device the
+  gateway has seen. When off, the integration does not read that list, does not
+  load the device tracker platform, and removes the trackers and client devices
+  it created before. The connected devices sensor then shows *unknown*. The
+  DOCSIS sensors and everything else stay the same. Turn it off if another
+  integration already tracks presence on your network.
+
+The client list is the slowest read on the gateway: on a busy LAN it can take
+more than its 60 second timeout. A failed read of the client list does not fail
+the poll. The integration reads it last, keeps the previous list for up to two
+failed polls, and after that shows the trackers as unavailable and the connected
+devices count as unknown until a read succeeds. A failed poll waits for the 60
+second timeout, so the trackers go unavailable about 18 minutes after the last
+good read. The log has a warning at the first failure and one when the trackers
+go unavailable. The DOCSIS sensors stay
+available the whole time, also when the first poll after a restart cannot read
+the client list.
 
 ## Notes
 

@@ -19,3 +19,9 @@ DEFAULT_HOST = "192.168.178.1"
 # only the fallbacks.
 MANUFACTURER = "Sagemcom"
 MODEL = "F3896LG"
+
+# Options flow keys. Client tracking reads /network/hosts every poll and adds a
+# device_tracker entity for every MAC the gateway has seen. It defaults to on so
+# entries created before the option existed keep their trackers.
+CONF_TRACK_CLIENTS = "track_clients"
+DEFAULT_TRACK_CLIENTS = True

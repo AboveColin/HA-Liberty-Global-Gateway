@@ -1,0 +1,4 @@
+# Test dependencies. pytest-homeassistant-custom-component pins the matching
+# homeassistant release.
+pytest-homeassistant-custom-component==0.13.375
+liberty-global-gateway==2.0.1

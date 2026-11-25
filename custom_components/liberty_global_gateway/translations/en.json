@@ -49,6 +49,20 @@
       "cannot_connect": "Could not reach the discovered gateway."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Gateway options",
+        "description": "Client tracking reads the gateway's client list (`/network/hosts`) on every poll and adds a device tracker for every device the gateway has seen. Home Assistant creates a tracker disabled when no other integration knows the device; enable the ones you want in the entity list. That list is the slowest read on the gateway. Turn it off if another integration already tracks presence on your network; the DOCSIS and other gateway sensors keep working.",
+        "data": {
+          "track_clients": "Track clients"
+        },
+        "data_description": {
+          "track_clients": "When off, the gateway's client list is not read, no device trackers or client devices are created, and the existing ones are removed. The connected devices sensor shows unknown."
+        }
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "docsis_status": {
