@@ -11,7 +11,7 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/abovecolin/HA-Liberty-Global-Gateway/issues",
   "requirements": [
-    "liberty-global-gateway==2.0.0"
+    "liberty-global-gateway==2.0.1"
   ],
   "ssdp": [
     {
@@ -27,5 +27,5 @@
       "deviceType": "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
     }
   ],
-  "version": "2.0.4"
+  "version": "2.0.5"
 }
