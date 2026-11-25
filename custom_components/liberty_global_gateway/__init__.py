@@ -258,11 +258,19 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
         The replay of a previous list is bounded like the session-busy replay:
         after MAX_STALE_CYCLES failed reads in a row the list is marked as not
         available, so the trackers go unavailable and the connected-devices
-        count goes unknown instead of showing presence from 15 minutes ago.
+        count goes unknown. That happens at the third failed poll in a row.
+        The coordinator starts the next interval when a poll ends, so with the
+        5 minute interval and the library's 60 s hosts timeout each failed
+        cycle takes about 6 minutes, and the newest shown presence is then
+        about 18 minutes old.
         """
         if not self.track_clients:
             return [], False
-        prev_hosts = (self.data or {}).get("hosts")
+        prev = self.data or {}
+        # Only a list that was current on the previous poll can be replayed.
+        # After a failed first poll the payload holds an empty placeholder
+        # list, which must not turn into "0 connected devices" on the next one.
+        prev_hosts = prev.get("hosts") if prev.get("hosts_available") else None
         try:
             hosts = await self.client.get_hosts(connected_only=False)
         except (GatewayAuthError, GatewaySessionBusyError):
@@ -275,9 +283,16 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
                 prev_hosts is not None
                 and self._stale_host_cycles <= MAX_STALE_CYCLES
             )
-            # Warn once per run of failures; a gateway that is slow every poll
-            # would otherwise write a warning every five minutes.
-            log = _LOGGER.warning if self._stale_host_cycles == 1 else _LOGGER.debug
+            # Warn at the first failure and when the trackers go unavailable,
+            # the two changes a user can act on. Every other failure in the
+            # run is debug; a gateway that is slow every poll would otherwise
+            # write a warning every five minutes.
+            went_unavailable = not available and prev_hosts is not None
+            log = (
+                _LOGGER.warning
+                if self._stale_host_cycles == 1 or went_unavailable
+                else _LOGGER.debug
+            )
             log(
                 "Reading the client list failed (%s in a row), %s: %s",
                 self._stale_host_cycles,
@@ -285,7 +300,7 @@ class GatewayDataUpdateCoordinator(DataUpdateCoordinator):
                 else "client trackers are unavailable until it succeeds",
                 err,
             )
-            return list(prev_hosts or []), available
+            return (list(prev_hosts) if available else []), available
         if self._stale_host_cycles:
             _LOGGER.info(
                 "Client list read again after %s failed polls", self._stale_host_cycles
@@ -433,39 +448,68 @@ def _async_migrate_tracker_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -
                 new_id,
             )
             ent_reg.async_update_entity(keep.entity_id, new_unique_id=new_id)
-        _async_apply_settings(hass, keep.entity_id, changes)
+        _async_apply_settings(hass, entry, keep.entity_id, changes)
 
 
 @callback
 def _async_apply_settings(
-    hass: HomeAssistant, entity_id: str, changes: dict[str, Any]
+    hass: HomeAssistant, entry: ConfigEntry, entity_id: str, changes: dict[str, Any]
 ) -> None:
     """Write the settings taken over from removed duplicates.
 
+    Each setting is written on its own, so a value the registry refuses costs
+    only that setting. A refused setting is logged as a warning with its
+    value, so the user can set it again by hand.
+
     Since Home Assistant 2026.10 an entity that is linked to a device and has
     no name of its own cannot have an area of its own; the registry raises
-    ValueError. The area then goes on the device, which has no area (the keep
-    rule only moves an area when the kept entry has none). A setting that the
-    registry still refuses is logged and skipped, so the migration never
-    stops the entry from loading.
+    ValueError. The area then goes on the device, but only if this config
+    entry is the device's only config entry and the device has no area. A
+    device area applies to every entity on the device, so on a device that
+    another integration also uses it would move that integration's entities.
     """
     ent_reg = er.async_get(hass)
     area_id = changes.pop("area_id", None)
-    if changes:
+    for key, value in changes.items():
         try:
-            ent_reg.async_update_entity(entity_id, **changes)
+            ent_reg.async_update_entity(entity_id, **{key: value})
         except ValueError as err:
-            _LOGGER.warning("Could not copy %s to %s: %s", changes, entity_id, err)
+            _LOGGER.warning(
+                "Could not copy %s %r to %s: %s", key, value, entity_id, err
+            )
     if area_id is None:
         return
     try:
         ent_reg.async_update_entity(entity_id, area_id=area_id)
-    except ValueError:
-        reg_entry = ent_reg.async_get(entity_id)
-        dev_reg = dr.async_get(hass)
-        device = dev_reg.async_get(reg_entry.device_id) if reg_entry else None
-        if device is not None and device.area_id is None:
-            dev_reg.async_update_device(device.id, area_id=area_id)
+        return
+    except ValueError as err:
+        refused = err
+    reg_entry = ent_reg.async_get(entity_id)
+    dev_reg = dr.async_get(hass)
+    device = (
+        dev_reg.async_get(reg_entry.device_id)
+        if reg_entry and reg_entry.device_id
+        else None
+    )
+    if device is not None and device.area_id is None and _only_this_entry(
+        device, entry
+    ):
+        dev_reg.async_update_device(device.id, area_id=area_id)
+        return
+    _LOGGER.warning(
+        "Could not copy area %r to %s, set it by hand: %s",
+        area_id,
+        entity_id,
+        refused,
+    )
+
+
+def _only_this_entry(device: dr.DeviceEntry, entry: ConfigEntry) -> bool:
+    """Return whether the config entry is the device's only config entry."""
+    if hasattr(device, "config_entry_id"):
+        # Releases with one config entry per device (2026.10 has it).
+        return device.config_entry_id == entry.entry_id
+    return device.config_entries == {entry.entry_id}
 
 
 def _settings_to_keep(

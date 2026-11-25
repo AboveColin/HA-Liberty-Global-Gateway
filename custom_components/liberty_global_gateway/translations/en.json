@@ -53,7 +53,7 @@
     "step": {
       "init": {
         "title": "Gateway options",
-        "description": "Client tracking reads the gateway's client list (`/network/hosts`) on every poll and adds a device tracker for every device the gateway has seen. That list is the slowest read on the gateway. Turn it off if another integration already tracks presence on your network; the DOCSIS and other gateway sensors keep working.",
+        "description": "Client tracking reads the gateway's client list (`/network/hosts`) on every poll and adds a device tracker for every device the gateway has seen. Home Assistant creates a tracker disabled when no other integration knows the device; enable the ones you want in the entity list. That list is the slowest read on the gateway. Turn it off if another integration already tracks presence on your network; the DOCSIS and other gateway sensors keep working.",
         "data": {
           "track_clients": "Track clients"
         },

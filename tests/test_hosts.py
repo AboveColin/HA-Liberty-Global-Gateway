@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_HOME, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
@@ -93,3 +95,58 @@ async def test_session_busy_during_hosts_is_not_swallowed(
     await setup_entry(hass, config_entry)
 
     assert config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_hosts_failures_warn_when_trackers_go_unavailable(
+    hass: HomeAssistant, config_entry, mock_client, caplog
+) -> None:
+    """A warning at the first failure and one when the trackers go unavailable.
+
+    The polls in between log at debug level only.
+    """
+    await setup_entry(hass, config_entry)
+    mock_client.get_hosts.side_effect = TIMEOUT
+    caplog.set_level(logging.DEBUG, logger="custom_components.liberty_global_gateway")
+
+    for _ in range(4):
+        await refresh(hass, config_entry)
+
+    warnings = [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "custom_components.liberty_global_gateway"
+        and r.levelno == logging.WARNING
+    ]
+    assert len(warnings) == 2
+    assert "(1 in a row), keeping the previous list" in warnings[0]
+    assert "(3 in a row), client trackers are unavailable" in warnings[1]
+
+
+async def test_hosts_failure_on_first_poll_warns_once(
+    hass: HomeAssistant, config_entry, mock_client, caplog
+) -> None:
+    """Without a previous list the first failure already means unavailable.
+
+    The later failures log at debug level and the count stays unknown.
+    """
+    mock_client.get_hosts.side_effect = TIMEOUT
+    caplog.set_level(logging.DEBUG, logger="custom_components.liberty_global_gateway")
+
+    await setup_entry(hass, config_entry)
+    for _ in range(3):
+        await refresh(hass, config_entry)
+        # The empty placeholder list of the first poll is never replayed as
+        # a current list, so the count stays unknown instead of turning to 0.
+        assert (
+            sensor_state(hass, config_entry, "connected_devices").state
+            == STATE_UNKNOWN
+        )
+
+    warnings = [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "custom_components.liberty_global_gateway"
+        and r.levelno == logging.WARNING
+    ]
+    assert len(warnings) == 1
+    assert "(1 in a row), client trackers are unavailable" in warnings[0]

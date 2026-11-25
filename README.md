@@ -174,7 +174,10 @@ The client list is the slowest read on the gateway: on a busy LAN it can take
 more than its 60 second timeout. A failed read of the client list does not fail
 the poll. The integration reads it last, keeps the previous list for up to two
 failed polls, and after that shows the trackers as unavailable and the connected
-devices count as unknown until a read succeeds. The DOCSIS sensors stay
+devices count as unknown until a read succeeds. A failed poll waits for the 60
+second timeout, so the trackers go unavailable about 18 minutes after the last
+good read. The log has a warning at the first failure and one when the trackers
+go unavailable. The DOCSIS sensors stay
 available the whole time, also when the first poll after a restart cannot read
 the client list.
 
